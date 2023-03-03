@@ -70,7 +70,7 @@ class CanDevice{
 		 * @param[in] mask Mask for message's id
 		 * @return int Returns 0 at sucess, 1 at failure
 		 */
-		int set_filter(uint16_t id, uint16_t mask);
+		int set_filter(uint16_t id, uint16_t mask=0xFFF);
 
 		/**
 		 * @brief Recieves Can messages.

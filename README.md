@@ -1,5 +1,11 @@
-# Wrapper Odrive
+# Wrapper Odrive S1/PRO
 napajeni  24 V
+
+## Požadavky před spuštěním
+Na Usb2CAN tripele má být spušten adapter _triple_.
+```sh ./triple.sh ```
+Dá se ověřit, že nstavení proběhlo správně přes ```candump canX```, kde ```X``` je cislo portu, na který je can na převodníku připojen.
+
 ## Specifikace C++ interface pro ODrive
 Dokumentace pro ODrive, kde lze dohledat všechny následující parametry zmíněné v tomto dokumentu
 https://docs.odriverobotics.com/v/latest/fibre_types/com_odriverobotics_ODrive.html
