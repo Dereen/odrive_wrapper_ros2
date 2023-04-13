@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string>
 #include <unistd.h>
+#include <memory>
 
 #include <net/if.h>
 #include <sys/ioctl.h>
@@ -22,6 +23,7 @@
 #include <linux/can.h>
 #include <linux/can/raw.h>
 
+
 /**
  * @brief Defines basic functions supported in CAN communication.
  * 
@@ -29,11 +31,14 @@
 class CanDevice{
 
 	private:
-		int s;						/*!< Socket id, filled automatically */
-		struct ifreq ifr; 			/*!< Structure with CAN socket info */
-		struct sockaddr_can * addr; /*!< Reference to CAN socket address*/
-		std::string dev_name;		/*!< CAN device name, dafaults to can0 */
-		bool active; 				/*!< True if socket was opened and not closed */
+		int                   s;			/*!< Socket id, filled automatically */
+		struct ifreq          ifr;       	/*!< Structure with CAN socket info */
+		struct sockaddr_can * addr;         /*!< Reference to CAN socket address */
+		std::string           dev_name;		/*!< CAN device name, dafaults to can0 */
+		bool                  active; 		/*!< True if socket was opened and not closed */
+
+        struct can_frame *    frame;        /*!< Reference to can_frame */
+
 	
 	public:
 		/**
@@ -81,12 +86,18 @@ class CanDevice{
 		 */
 		int recieve(struct can_frame * frame, int msg_num);
 
-		CanDevice(): dev_name("can0"), active(false) {};
+		CanDevice(): dev_name("can0"), active(false){};
 
 		CanDevice(std::string name): dev_name(name), active(false){};
 
 		~CanDevice(){
 			if (this->active) close_connection();  // if connection is active, close socket
 		};
+
+        void send_message( uint16_t messageID, uint16_t msgLen, char * data=NULL, bool respond=false){
+            
+            send(messageID, msgLen, data, respond); 
+            
+        };
 
 };

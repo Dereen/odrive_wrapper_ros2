@@ -15,13 +15,20 @@
 #include <unistd.h>
 #include <iostream>
 
-int CanDevice::send(uint16_t id, uint16_t dlc, char *data, bool rtr)
+int CanDevice::send(uint16_t id, uint16_t dlc, char *data=NULL, bool rtr=false)
 {
 
 	struct can_frame f;
 	// define can frame header
 	f.can_id = rtr ? id + CAN_RTR_FLAG : id;
 	f.can_dlc = dlc;
+
+	if (data)	{ // fill recieved data
+		for (int i =0; i< dlc; i++){
+			f.data[i] = *data;
+			data++;
+			}
+		}
 
 	// write created can message
 	if (write(s, &f, sizeof(struct can_frame)) != sizeof(struct can_frame))	{
@@ -36,7 +43,6 @@ int CanDevice::set_filter(uint16_t id, uint16_t mask)
 {
 	std::cout << "[CanDev] Set message filter for msg id " << id << " with mask " << mask << std::endl;
 	
-	int i;
 	int nbytes;
 	struct can_frame frame;
 	struct can_filter rfilter[1];
