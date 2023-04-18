@@ -23,7 +23,7 @@
 #include <linux/can.h>
 #include <linux/can/raw.h>
 
-
+//#define DEBUG
 /**
  * @brief Defines basic functions supported in CAN communication.
  * 
@@ -65,7 +65,7 @@ class CanDevice{
 		 * @param[in] rtr Bool, defines if the message should have a response
 		 * @return int Returns 0 at sucess, 1 at failure
 		 */
-		int send(uint16_t id, uint16_t dlc, char * data, bool rtr=false); // send can message
+		int send(uint16_t id, uint16_t dlc, char * data=NULL, bool rtr=false); // send can message
 		
 		/**
 		 * @brief Set the message filter.
@@ -81,10 +81,11 @@ class CanDevice{
 		 * @brief Recieves Can messages.
 		 * 
 		 * @param[out] frame Pointer to frame to store Can message
+		 * @param[out] recieved timestamp
 		 * @param[in] msg_num Defines how meany messages should be read
 		 * @return int Returns 0 at sucess, 1 at failure
 		 */
-		int recieve(struct can_frame * frame, int msg_num);
+		int recieve(struct can_frame * frame,struct timeval * timestamp, int msg_num);
 
 		CanDevice(): dev_name("can0"), active(false){};
 

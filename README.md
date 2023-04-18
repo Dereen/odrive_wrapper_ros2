@@ -1,6 +1,8 @@
 # Wrapper Odrive S1/PRO
-napajeni  24 V
-nastaven bitrate 500 000
+napajeni  24 V  
+nastaven bitrate 500 000  
+sudo ip link set can0 type can bitrate 500000  
+sudo ip link set up can0  
 
 ## Požadavky před spuštěním
 Na Usb2CAN tripele má být spušten adapter _triple_.

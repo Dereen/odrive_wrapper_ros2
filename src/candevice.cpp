@@ -15,7 +15,8 @@
 #include <unistd.h>
 #include <iostream>
 
-int CanDevice::send(uint16_t id, uint16_t dlc, char *data=NULL, bool rtr=false)
+
+int CanDevice::send(uint16_t id, uint16_t dlc, char *data, bool rtr)
 {
 
 	struct can_frame f;
@@ -24,6 +25,7 @@ int CanDevice::send(uint16_t id, uint16_t dlc, char *data=NULL, bool rtr=false)
 	f.can_dlc = dlc;
 
 	if (data)	{ // fill recieved data
+		std::cout << "fill input data" << std::endl;
 		for (int i =0; i< dlc; i++){
 			f.data[i] = *data;
 			data++;
@@ -32,7 +34,7 @@ int CanDevice::send(uint16_t id, uint16_t dlc, char *data=NULL, bool rtr=false)
 
 	// write created can message
 	if (write(s, &f, sizeof(struct can_frame)) != sizeof(struct can_frame))	{
-		perror("Write");
+		perror("Write error");
 		return 1;
 	}
 
@@ -55,14 +57,14 @@ int CanDevice::set_filter(uint16_t id, uint16_t mask)
 	nbytes = read(s, &frame, sizeof(struct can_frame));
 
 	if (nbytes < 0)	{
-		perror("Read");
+		perror("Read error");
 		return 1;
 	}
 
 #ifdef DEBUG
 	printf("0x%03X [%d] ", frame.can_id, frame.can_dlc);
 
-	for (i = 0; i < frame.can_dlc; i++)
+	for (int i = 0; i < frame.can_dlc; i++)
 		printf("%02X ", frame.data[i]);
 
 	printf("\r\n");
@@ -71,15 +73,18 @@ int CanDevice::set_filter(uint16_t id, uint16_t mask)
 	return 0;
 }
 
-int CanDevice::recieve(struct can_frame *frame, int msg_num)
+int CanDevice::recieve(struct can_frame *frame, struct timeval * timestamp, int msg_num)
 {
 	// read a single can frame
-
 	int nbytes = read(s, frame, sizeof(struct can_frame) * msg_num);
 
 	if (nbytes < 0)	{ // nothing to read -> error, should at least get heartbeat
-		perror("Read");
+		perror("Read error");
 		return 1;
+	}
+	else{ // get timestamp
+
+		int error = ioctl(s, SIOCGSTAMP, timestamp);
 	}
 
 #ifdef DEBUG
@@ -102,7 +107,7 @@ int CanDevice::init_connection()
 	std::cout << "[CanDev] Init connection" << std::endl;
 
 	if ((this->s = socket(PF_CAN, SOCK_RAW, CAN_RAW)) < 0){
-		perror("Socket");
+		perror("Socket error");
 		return 1;
 	}
 
@@ -124,7 +129,7 @@ int CanDevice::init_connection()
 	}
 	this->active = true;
 
-	std::cout << "[CanDev] Opened CAN socket" << std::endl;
+	std::cout << "[CanDev] Opened CAN socket with device " <<  this->dev_name.c_str()<< std::endl;
 
 	return 0;
 }
