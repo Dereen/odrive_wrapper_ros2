@@ -10,9 +10,9 @@
  */
 
 #pragma once
-#include <iostream>
 #include <vector>
 #include <memory>
+#include <cstring>
 
 #include "candevice.h"
 #include "odriveaxis.h"
@@ -20,9 +20,10 @@
 
 #include <thread>
 #include <mutex>
+#include <unordered_map>
 
 /**
- * @brief time constants at which the periodically updated data will be fetched
+ * @brief Time constants at which the periodically updated data will be fetched
  */
 struct updatePeriods
 {
@@ -32,23 +33,41 @@ struct updatePeriods
 
 #define CAN_MSGS_LEN 8, 7, 0, 8, 4, 4, 8, 8, 8, 8, 4, 8, 0, 4, 8, 4, 8, 8, 0, 8, 0, 4, 4, 8, 4, 4, 0
 
+/**
+ * @brief A class for communicating with odrive axes by CAN messges.
+ * 
+ * The class expects the axes to be enumerated continuously from 0. 
+ *       So that if four axes are connected the axes_num = 4 , the expected axes ID are {0, 1, 2, 3}.
+ *       Any other ID's are ignored.
+ * 
+ * Note: in Odrive's simpleCAN implementation, the CAN's error message is incorrectly  implemented.
+ *       Instead of sending the return message with CAN_ERR_FLAG, Odrive returns message filled with 0's, 
+ *       which can be easily misinterpreted as the response of Axis0 to get_version. 
+ *       Therefore, do not use the axis0, set axes_num = number of used axes + 1 and ignore data stored at axis0. 
+ */
 class OdriveCan : OdriveAxis
 {
-friend OdriveAxis;
-    typedef struct 
+    friend OdriveAxis;
+    typedef struct
     {
-        can_frame      frame;
+        can_frame frame;
         struct timeval timestamp;
-    }canMsg;
+    } canMsg;
 
 public:
     std::shared_ptr<struct updatePeriods> periods; /*!< time constants at which the periodically updated data will be fetched */
 
     const int canMsgLen[28];
 
+    friend std::ostream &operator<<(std::ostream &out, OdriveCan const *oc);
+
+    int get_axes_num();
+
 private:
     int axes_num;
     std::vector<std::shared_ptr<class OdriveAxis>> axes;
+    std::unordered_map<int, int> axes_ids;  /*!< Maps axis ID to index in axes vector */
+
 
     int buffer_len;
     typedef boost::circular_buffer<canMsg> can_circ_buffer;
@@ -65,14 +84,14 @@ private:
 
     enum
     {
-        GET_VERSION           = 0x000,
+        GET_VERSION = 0x000,
         HEARTBEAT,
         ESTOP,
         GET_ERROR,
-        SET_AXIS_NODE_ID      = 0x006,
+        SET_AXIS_NODE_ID = 0x006,
         SET_AXIS_STATE,
         GET_ENCODER_ESTIMATES = 0x009,
-        SET_CONTROLLER_MODE   = 0x00b,
+        SET_CONTROLLER_MODE = 0x00b,
         SET_INPUT_POS,
         SET_INPUT_VEL,
         SET_INPUT_TORQUE,
@@ -94,46 +113,23 @@ private:
         ENTER_DFU_MODE
     };
 
-    void init(){
-        // create shared pointers for each Odrive axis and init the instances of class Axis
-        for (int i = 0; i < axes_num; i++){
-            axes.push_back(std::make_shared<class OdriveAxis>(i));
-
-            // init circular buffer
-            input_buffer.push_back(std::make_shared<can_circ_buffer>(buffer_len));
-        }
-
-        // init update periods
-        periods = std::make_shared<struct updatePeriods>();
-        set_periods(100, 100);
-
-        // init can listener
-        can_dev = std::make_unique<class CanDevice>();
-        std::cout << "[OdriveCan] start threads" << std::endl;
-        th_recieve = std::thread(&OdriveCan::receive_msgs, this);
-        th_process = std::thread(&OdriveCan::process_msgs, this);
-
-        can_dev->init_connection();
-    }
+    void init();
 
 public:
-    //bool set_regulator(){};
 
-    // struct axisErrors get_errors(){};
-
-    OdriveCan() :  canMsgLen{CAN_MSGS_LEN}, axes_num(6), buffer_len(10), run(1)
+    OdriveCan() : canMsgLen{CAN_MSGS_LEN}, axes_num(6), buffer_len(10), run(1)
     {
         std::cout << "[OdriveCAN] Init Ordive can constructor" << std::endl;
         this->init();
-        
     };
 
-    OdriveCan(int axes_num) : canMsgLen{CAN_MSGS_LEN},axes_num(axes_num), buffer_len(10), run(1)
+    OdriveCan(int axes_num) : canMsgLen{CAN_MSGS_LEN}, axes_num(axes_num), buffer_len(10), run(1)
     {
         this->init();
     };
 
-    ~OdriveCan(){
+    ~OdriveCan()
+    {
         th_recieve.join();
         th_process.join();
     };
@@ -144,29 +140,7 @@ public:
      * @param[in] heartbeat period at which heartbeat msg is processed
      * @param[in] busUI period at which bus voltage and current are updated
      */
-    void set_periods(int32_t heartbeat, int32_t busUI)
-    {
-        periods->heartbeat = heartbeat;
-        periods->busIU = busUI;
-    }
-
-    int get_version(int axisID)
-    {
-        std::cout << "[GetVersion] ASK for version " << std::endl;
-        // construct can message
-        int msg_id = (axisID * 32) + GET_VERSION; // axis ID + can msg name
-        std::cout << "[GetVersion] CAN msg ID" << msg_id << std::endl;
-
-        //char buf[canMsgLen[GET_VERSION]];
-
-        int ret = can_dev->send(msg_id, canMsgLen[GET_VERSION], NULL, true);
-
-        if (ret < 0)
-            throw std::runtime_error("The wrong number of bytes were written to CAN");
-
-        return 0;
-
-    }
+    void set_periods(int32_t heartbeat, int32_t busUI);
 
     /**
      * @brief parses recieved can header
@@ -175,17 +149,7 @@ public:
      * @param[out] axisID corresponding odrive axis id
      * @param[out] cmdID command id
      */
-    void parse_header(uint32_t header, int *axisID, int *cmdID)
-    {
-
-        bool error_msg = header & ((1u << 30) - 1);
-        if (!error_msg){
-            // parse axis ID, mesgs of axis 0 start at 0x00, axis 1 - 0x20, axis 2- 0x40 .. axis 6- 0xc0
-            *axisID = axis_from_header(header);
-
-            *cmdID = can_id_from_header(header);
-        }
-    }
+    void parse_header(uint32_t header, int *axisID, int *cmdID);
 
     /**
      * @brief Returns CAN message ID from header
@@ -193,10 +157,7 @@ public:
      * @param[in] header recieved CAN message header
      * @return int CAN message ID
      */
-    int can_id_from_header(uint32_t header)
-    {
-        return (header & 0x1F);
-    }
+    int can_id_from_header(uint32_t header);
 
     /**
      * @brief returns axis ID from can_frame header
@@ -204,172 +165,103 @@ public:
      * @param[in] header CAN frame header
      * @return int axis ID
      */
-    int axis_from_header(uint32_t header)
-    {
+    int axis_from_header(uint32_t header);
 
-        uint32_t id = header & ((1u << 29) - 1); // lower 29 bits
-        return (id & 0x10) / 2;
-    }
+    bool check_msg_error(uint32_t header);
+
     /**
      * @brief recieves can messages and stores them in circluar buffers for each axis
      *
      */
-    void receive_msgs()
-    {
+    void receive_msgs();
 
-        std::cout << "[RECEIVE] Start recieve thread" << std::endl;
-        int ax_id;
-        struct timeval timestamp;
-        canMsg msg;
+    /**
+     * @brief processes can messages from circluar buffers for each axis
+     *
+     */
+    void process_msgs();
 
-        struct can_frame frame;
+    void parse_version(int axisID, canMsg msg);
 
-        while (run)
-        {
-            // read meessages
-            //std::cout << "[RECEIVE] Recieve" << std::endl;
-            can_dev->recieve(&frame, &timestamp, 1);
-            ax_id = axis_from_header(frame.can_dlc);
-            //std::cout << "recieved message from axis " << ax_id << std::endl;
-            // store message with timestamp
-            msg = {frame, timestamp};
-            msg_mutex.lock();
-            input_buffer[ax_id]->push_back(msg); // not sure if will work
-            msg_mutex.unlock();
+    void parse_heartbeat(int axisID, canMsg msg);
 
-            if (input_buffer[ax_id]->full())
-                throw std::runtime_error("Circular buffer is full");
-        }
+    void parse_error(int axisID, canMsg msg);
 
-        std::cout << "[RECEIVE] End recieve thread" << std::endl;
-    };
+    void parse_encoder_estimates(int axisID, canMsg msg);
 
-    void process_msgs()
-    {
-        std::cout << "[PROCESS] start processing thread" << std::endl;
-        canMsg msg;
-        while (run)
-        {
-            for (int i = 0; i < axes_num; i++)
-            { // check buffer for each axis
+    void parse_iq(int axisID, canMsg msg);
 
-                //if (!input_buffer[i]->empty()) std::cout << "[PROCESS] Input buffer of axis " << i << " is not empty" << std::endl;
-                //else std::cout << "[PROCESS] Input buffer of axis  " << i <<" is empty" << std::endl;
+    void parse_temp(int axisID, canMsg msg);
 
+    void parse_ui(int axisID, canMsg msg);
 
-                if (!input_buffer[i]->empty())
-                    { // if buffer for given axis is not empty
-                        //std::cout << "[PROCESS] Process message on axis " << i << std::endl;
-                        msg_mutex.lock();
-                        msg = input_buffer[i]->front();
-                        input_buffer[i]->pop_front();
-                        msg_mutex.unlock();
-                    
-                    int canID = can_id_from_header(msg.frame.can_id);
+    void parse_adc(int axisID, canMsg msg);
 
-                    switch (canID)
-                    {
-                    case GET_VERSION:
-                        parse_version(i, msg);
-                        std::cout << "got version reply\n";
-                        break;
-                    case HEARTBEAT:
-                        parse_heartbeat(i, msg);
-                        break;
-                    case ESTOP:
-                        break;
-                    case GET_ERROR:
-                        parse_error(i, msg);
-                        break;
-                    case GET_ENCODER_ESTIMATES:
-                        parse_encoder_estimates(i, msg);
-                        break;
-                    case GET_IQ:
-                        parse_iq(i, msg);
-                        break;
-                    case GET_TEMP:
-                        parse_temp(i, msg);
-                        break;
-                    case GET_BUS_VOLTAGE_CURRENT:
-                        parse_ui(i, msg);
-                        break;
-                    case GET_ADC_VOLTAGE:
-                        parse_adc(i, msg);
-                        break;
-                    case GET_CONTROLLER_ERROR:
-                        parse_controller_error(i, msg);
-                        break;
-                    }
-                }
-            }
-            usleep(100);
-        }
-    }
+    void parse_controller_error(int axisID, canMsg msg);
 
-void parse_version(int axisID, canMsg msg){
+    uint32_t get32from8(uint8_t *data, int startIdx);
 
-   uint8_t hw_maj = uint8_t(msg.frame.data[1]);
-   uint8_t hw_min = uint8_t(msg.frame.data[2]);
-   uint8_t hw_var = uint8_t(msg.frame.data[3]);
-   uint8_t fw_maj = uint8_t(msg.frame.data[4]);
-   uint8_t fw_min = uint8_t(msg.frame.data[5]);
-   uint8_t fw_rev = uint8_t(msg.frame.data[6]);
+    void get_char_from_uint(char* arr, uint32_t var);
 
-   axes[axisID]->set_axis_version(hw_maj, hw_min, hw_var,fw_maj, fw_min, fw_rev, msg.timestamp);
-}
+    void get_char_from_uints(char *arr, uint32_t var1, uint32_t var2);
 
-void parse_heartbeat(int axisID, canMsg msg){
+    // USER called functions ---------------------------------------------------------
+    /**
+     * @brief Gets the odrive version by calling get_version message
+     * 
+     * @param[in] axisID 
+     * @return int returns -1 at failure, 0 at sucess
+     */
+    int call_get_version(int axisID);
 
-    uint32_t err = get32from8(msg.frame.data, 0);
+    int call_estop(int axisID);
 
-    axes[axisID]->set_axis_state(err, msg.frame.data[4], msg.frame.data[5], msg.frame.data[6], msg.timestamp);
-    
-}
+    int call_get_error(int axisID);
 
-void parse_error(int axisID, canMsg msg){
-    uint32_t err = get32from8(msg.frame.data, 0);
-    uint32_t reason = get32from8(msg.frame.data, 4);
-    axes[axisID]->update_error(err, reason, msg.timestamp);
-}
+    int call_set_axis_node_id(int oldID, uint32_t newID);
 
-void parse_encoder_estimates(int axisID, canMsg msg){
-    uint32_t err =  get32from8(msg.frame.data, 0);
-    uint32_t reason =  get32from8(msg.frame.data, 4);
-    axes[axisID]->update_estimates(err, reason, msg.timestamp);
-}
+    int call_set_axis_state(int axisID, uint32_t req_state);
 
-void parse_iq(int axisID, canMsg msg){
-    uint32_t setpoint =  get32from8(msg.frame.data, 0);
-    uint32_t measured =  get32from8(msg.frame.data, 4);
-    axes[axisID]->update_iq(setpoint, measured, msg.timestamp);
-}
+    int call_get_encoder_estimates(int axisID);
 
-void parse_temp(int axisID, canMsg msg){
-    uint32_t fet =  get32from8(msg.frame.data, 0);
-    uint32_t motor =  get32from8(msg.frame.data, 4);
-    axes[axisID]->update_temp(fet, motor, msg.timestamp);
-}
+    int call_set_encoder_mode(int axisID, uint32_t control_mode, uint32_t input_mode);
 
-void parse_ui(int axisID, canMsg msg){
-    uint32_t voltage =  get32from8(msg.frame.data, 0);
-    uint32_t current =  get32from8(msg.frame.data, 4);
-    axes[axisID]->update_ui(voltage, current, msg.timestamp);
-}
+    int call_set_input_pos(int axisID);
 
-void parse_adc(int axisID, canMsg msg){
-    
-    uint32_t voltage =  get32from8(msg.frame.data, 0);
-    axes[axisID]->update_adc(voltage, msg.timestamp);
-}
+    int call_set_input_vel(int axisID);
 
-void parse_controller_error(int axisID, canMsg msg){
-    uint32_t err =  get32from8(msg.frame.data, 0);
-    axes[axisID]->update_controller_err(err, msg.timestamp);
-    
-}
+    int call_set_input_torque(int axisID);
 
-uint32_t get32from8( uint8_t * data, int startIdx){
-    return  data[startIdx] | data[startIdx + 1] << 8 |data[startIdx + 2] << 16 |data[startIdx + 3] << 24;
-}
+    int call_set_limits(int axisID);
+
+    int call_start_anticogging(int axisID);
+
+    int call_set_teaj_vel_limit(int axisID);
+
+    int call_set_traj_accel_limits(int axisID);
+
+    int call_set_traj_inertia(int axisID);
+
+    int call_get_iq(int axisID);
+
+    int call_get_tempterature(int axisID);
+
+    int call_reboot(int axisID);
+
+    int call_get_bus_ui(int axisID);
+
+    int call_clear_errors(int axisID);
+
+    int call_set_absolute_position(int axisID);
+
+    int call_set_pos_gain(int axisID);
+
+    int call_set_vel_gains(int axisID);
+
+    int call_get_adc_voltage(int axisID);
+
+    int call_get_controller_Error(int axisID);
+
+    int call_enter_dfu_mode(int axisID);
 
 };

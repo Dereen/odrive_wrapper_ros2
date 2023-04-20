@@ -15,6 +15,8 @@
 #include <string>
 #include <unistd.h>
 #include <memory>
+#include <iostream>
+#include <boost/optional.hpp>
 
 #include <net/if.h>
 #include <sys/ioctl.h>
@@ -65,7 +67,17 @@ class CanDevice{
 		 * @param[in] rtr Bool, defines if the message should have a response
 		 * @return int Returns 0 at sucess, 1 at failure
 		 */
-		int send(uint16_t id, uint16_t dlc, char * data=NULL, bool rtr=false); // send can message
+		int send(uint16_t id, uint16_t dlc, char * data, bool rtr = false); // send can message
+
+				/**
+		 * @brief Sends a CAN message
+		 * 
+		 * @param[in] id Message's CAN id
+		 * @param[in] dlc Message's length in bytes
+		 * @param[in] rtr Bool, defines if the message should have a response
+		 * @return int Returns 0 at sucess, 1 at failure
+		 */
+		int send(uint16_t id, uint16_t dlc, bool rtr = false); // send can message
 		
 		/**
 		 * @brief Set the message filter.
@@ -100,5 +112,14 @@ class CanDevice{
             send(messageID, msgLen, data, respond); 
             
         };
-
 };
+
+static inline std::ostream& operator<< (std::ostream &out, struct timeval const* time) {
+    out << time->tv_sec << " s " << time->tv_usec << " us";
+    return out;
+}
+
+static inline std::ostream& operator<< (std::ostream &out, struct timeval const& time) {
+    out << time.tv_sec << " s " << time.tv_usec << " us";
+    return out;
+}

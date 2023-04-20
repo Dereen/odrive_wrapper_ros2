@@ -19,17 +19,19 @@
 int main(int argc, char **argv)
 {
 	printf("create can device\n");
-	OdriveCan * odrive = new OdriveCan();
-	// int s;
-	// struct ifreq ifr;
-	// struct sockaddr_can addr;
-	// dev_init(&s, &ifr, &addr);
-	// struct can_frame frame[2];
-	printf("Ask to get version\n");
-	odrive->get_version(0);
-	// std::cout << odrive << std::endl;
+	OdriveCan * odrive = new OdriveCan(2);
 
-	sleep(10);
+	printf("Ask to get version\n");
+	odrive->call_get_version(1);
+	odrive->call_get_bus_ui(1);
+	odrive->call_get_adc_voltage(1);
+
+	// print axis stats
+	for (auto i =0 ; i< 2; i++){
+		std::cout << odrive << std::endl;
+
+		sleep(1);
+	}
 
 	return 0;
 }

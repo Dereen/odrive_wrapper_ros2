@@ -14,9 +14,10 @@
 #include <string.h>
 #include <unistd.h>
 #include <iostream>
+#include <string.h>
 
 
-int CanDevice::send(uint16_t id, uint16_t dlc, char *data, bool rtr)
+int CanDevice::send(uint16_t id, uint16_t dlc, char * data, bool rtr)
 {
 
 	struct can_frame f;
@@ -24,19 +25,56 @@ int CanDevice::send(uint16_t id, uint16_t dlc, char *data, bool rtr)
 	f.can_id = rtr ? id + CAN_RTR_FLAG : id;
 	f.can_dlc = dlc;
 
-	if (data)	{ // fill recieved data
+	if (data)	{ // fill data
 		std::cout << "fill input data" << std::endl;
 		for (int i =0; i< dlc; i++){
-			f.data[i] = *data;
-			data++;
+			f.data[i] = data[i];
 			}
 		}
 
 	// write created can message
 	if (write(s, &f, sizeof(struct can_frame)) != sizeof(struct can_frame))	{
 		perror("Write error");
-		return 1;
+		return -1;
 	}
+
+	#ifdef DEBUG
+	printf("-> 0x%03X [%d] ", f.can_id, f.can_dlc);
+
+	for (int i = 0; i < f.can_dlc; i++)
+		printf("%02X ", f.data[i]);
+
+	printf("\r\n");
+	
+	#endif
+
+	return 0;
+}
+
+int CanDevice::send(uint16_t id, uint16_t dlc, bool rtr)
+{
+
+	struct can_frame f;
+	// define can frame header
+	f.can_id = rtr ? id + CAN_RTR_FLAG : id;
+	f.can_dlc = dlc;
+	memset(f.data, 0, dlc);
+
+	// write created can message
+	if (write(s, &f, sizeof(struct can_frame)) != sizeof(struct can_frame))	{
+		perror("Write error");
+		return -1;
+	}
+
+	#ifdef DEBUG
+	printf("-> 0x%03X [%d] ", f.can_id, f.can_dlc);
+
+	for (int i = 0; i < f.can_dlc; i++)
+		printf("%02X ", f.data[i]);
+
+	printf("\r\n");
+	
+	#endif
 
 	return 0;
 }
@@ -85,6 +123,10 @@ int CanDevice::recieve(struct can_frame *frame, struct timeval * timestamp, int 
 	else{ // get timestamp
 
 		int error = ioctl(s, SIOCGSTAMP, timestamp);
+		if (error < 0){
+			perror("Read error");
+			return 1;
+		}
 	}
 
 #ifdef DEBUG
