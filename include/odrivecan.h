@@ -201,9 +201,16 @@ public:
 
     uint32_t get32from8(uint8_t *data, int startIdx);
 
-    void get_char_from_uint(char* arr, uint32_t var);
+   // void get_char_from_uint(char* arr, uint32_t var);
 
-    void get_char_from_uints(char *arr, uint32_t var1, uint32_t var2);
+    template <typename T> 
+    void get_char_from_num(char *arr, T var);
+
+    template <typename T> 
+    void get_char_from_nums(char *arr, T var1, T var2);
+
+    template <typename T, typename F>
+    void get_char_from_nums(char *arr, T var1, F var2, F var3);
 
     // USER called functions ---------------------------------------------------------
     /**
@@ -224,23 +231,23 @@ public:
 
     int call_get_encoder_estimates(int axisID);
 
-    int call_set_encoder_mode(int axisID, uint32_t control_mode, uint32_t input_mode);
+    int call_set_controller_mode(int axisID, uint32_t control_mode, uint32_t input_mode);
 
-    int call_set_input_pos(int axisID);
+    int call_set_input_pos(int axisID, uint32_t input_pos, float vel_ff, float torque_ff) ;
 
-    int call_set_input_vel(int axisID);
+    int call_set_input_vel(int axisID, uint32_t input_vel, uint32_t input_torque_ff);
 
-    int call_set_input_torque(int axisID);
+    int call_set_input_torque(int axisID, uint32_t torque) ;
 
-    int call_set_limits(int axisID);
+    int call_set_limits(int axisID, uint32_t velocity, uint32_t current);
 
-    int call_start_anticogging(int axisID);
+    int call_start_anticogging(int axisID); 
 
-    int call_set_teaj_vel_limit(int axisID);
+    int call_set_traj_vel_limit(int axisID,  uint32_t lim);
 
-    int call_set_traj_accel_limits(int axisID);
+    int call_set_traj_accel_limits(int axisID, uint32_t accel, uint32_t decel);
 
-    int call_set_traj_inertia(int axisID);
+    int call_set_traj_inertia(int axisID, uint32_t inertia);
 
     int call_get_iq(int axisID);
 
@@ -252,11 +259,11 @@ public:
 
     int call_clear_errors(int axisID);
 
-    int call_set_absolute_position(int axisID);
+    int call_set_absolute_position(int axisID, uint32_t pos);
 
-    int call_set_pos_gain(int axisID);
+    int call_set_pos_gain(int axisID, uint32_t gain);
 
-    int call_set_vel_gains(int axisID);
+    int call_set_vel_gains(int axisID, uint32_t gain, uint32_t integrator);
 
     int call_get_adc_voltage(int axisID);
 

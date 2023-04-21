@@ -21,6 +21,7 @@
 #include <thread>
 #include <mutex>
 #include <unordered_map>
+#include <sys/time.h>
 
 #include "odrivecan.h"
 
@@ -305,24 +306,27 @@ uint32_t OdriveCan::get32from8(uint8_t *data, int startIdx)
     return data[startIdx + 3] | data[startIdx + 2] << 8 | data[startIdx + 1] << 16 | data[startIdx] << 24;
 }
 
-void OdriveCan::get_char_from_uint(char *arr, uint32_t var)
+template <typename T>
+void OdriveCan::get_char_from_num(char *arr, T var)
 {
-    memcpy(arr, &var, sizeof(uint32_t));
+    memcpy(arr, &var, sizeof(T));
 }
 
-void OdriveCan::get_char_from_uints(char *arr, uint32_t var1, uint32_t var2)
+template <typename T>
+void OdriveCan::get_char_from_nums(char *arr, T var1, T var2)
 {
-    this->get_char_from_uint(arr, var1)
-    this->get_char_from_uint(arr+sizeof(uint32_t), var2);
+    this->get_char_from_num(arr, var1);
+    this->get_char_from_num(arr + sizeof(T), var2);
 }
 
-void OdriveCan::get_char_from_uints(char *arr, uint32_t var1, float var2, float var3)
+template <typename T, typename F>
+void OdriveCan::get_char_from_nums(char *arr, T var1, F var2, F var3)
 {
-    this->get_char_from_uint(arr, &var1);
-    char * ptr = arr+sizeof(uint32_t);
-    memcpy(ptr, &var2, sizeof(float));
-    ptr += sizeof(float);
-    memcpy(ptr, &var3, sizeof(float));
+    this->get_char_from_num(arr, &var1);
+    char *ptr = arr + sizeof(T);
+    memcpy(ptr, &var2, sizeof(F));
+    ptr += sizeof(F);
+    memcpy(ptr, &var3, sizeof(F));
 }
 
 std::ostream &operator<<(std::ostream &out, OdriveCan const *oc)
@@ -366,6 +370,8 @@ int OdriveCan::call_estop(int axisID)
         return ret;
     }
 
+    this->axes[axes_ids[axisID]]->update_estop(true);
+
     return 0;
 }
 
@@ -392,7 +398,7 @@ int OdriveCan::call_set_axis_node_id(int oldID, uint32_t newID)
               << std::hex << msg_id << std::dec << std::endl;
 
     char data[4];
-    get_char_from_uint(data, newID);
+    this->get_char_from_num<uint32_t>(data, newID);
 
     int ret = can_dev->send(msg_id, canMsgLen[SET_AXIS_NODE_ID], data, true);
 
@@ -421,7 +427,7 @@ int OdriveCan::call_set_axis_state(int axisID, uint32_t req_state)
               << std::hex << msg_id << std::dec << std::endl;
 
     char data[4];
-    get_char_from_uint(data, req_state);
+    this->get_char_from_num<uint32_t>(data, req_state);
 
     int ret = can_dev->send(msg_id, canMsgLen[SET_AXIS_STATE], data, true);
 
@@ -452,7 +458,7 @@ int OdriveCan::call_get_encoder_estimates(int axisID)
     return 0;
 };
 
-int OdriveCan::call_set_encoder_mode(int axisID, uint32_t control_mode, uint32_t input_mode)
+int OdriveCan::call_set_controller_mode(int axisID, uint32_t control_mode, uint32_t input_mode)
 {
     // construct can message
     int msg_id = axisID << 5 | SET_CONTROLLER_MODE; // axis ID + can msg name
@@ -460,7 +466,7 @@ int OdriveCan::call_set_encoder_mode(int axisID, uint32_t control_mode, uint32_t
               << std::hex << msg_id << std::dec << std::endl;
 
     char data[8];
-    this->get_char_from_uints(data, control_mode, input_mode);
+    this->get_char_from_nums<uint32_t>(data, control_mode, input_mode);
 
     int ret = can_dev->send(msg_id, canMsgLen[SET_CONTROLLER_MODE], data, true);
 
@@ -470,18 +476,18 @@ int OdriveCan::call_set_encoder_mode(int axisID, uint32_t control_mode, uint32_t
         return ret;
     }
 
-    this->axes[axes_ids[axisID]]->update_axis_requested_state(req_state);
+    this->axes[axes_ids[axisID]]->update_controller_mode(control_mode, input_mode);
     return 0;
 };
 
-int OdriveCan::call_set_input_pos(int axisID, uint32_t input_pos, float vel_ff, float torque_ff) { 
-        // construct can message
+int OdriveCan::call_set_input_pos(int axisID, uint32_t input_pos, float vel_ff, float torque_ff)
+{
     int msg_id = axisID << 5 | SET_INPUT_POS; // axis ID + can msg name
-    std::cout << "[SetInputPos] Ask to set encoder mode - CAN msg ID"
+    std::cout << "[SetInputPos] Ask to set input position - CAN msg ID"
               << std::hex << msg_id << std::dec << std::endl;
 
     char data[8];
-    this->get_char_from_uints(data, input_pos, vel_ff, torque_ff);
+    this->get_char_from_nums<uint32_t, float>(data, input_pos, vel_ff, torque_ff);
 
     int ret = can_dev->send(msg_id, canMsgLen[SET_INPUT_POS], data, true);
 
@@ -491,23 +497,161 @@ int OdriveCan::call_set_input_pos(int axisID, uint32_t input_pos, float vel_ff, 
         return ret;
     }
 
-    this->axes[axes_ids[axisID]]->update_axis_requested_state(req_state);
+    this->axes[axes_ids[axisID]]->update_input_pos(input_pos, vel_ff, torque_ff);
+    return 0;
+};
+
+int OdriveCan::call_set_input_vel(int axisID, uint32_t input_vel, uint32_t input_torque_ff)
+{
+    int msg_id = axisID << 5 | SET_INPUT_VEL; // axis ID + can msg name
+    std::cout << "[SetInputVel] Ask to set input velocity - CAN msg ID"
+              << std::hex << msg_id << std::dec << std::endl;
+
+    char data[8];
+    this->get_char_from_nums<uint32_t>(data, input_vel, input_torque_ff);
+
+    int ret = can_dev->send(msg_id, canMsgLen[SET_INPUT_VEL], data, true);
+
+    if (ret < 0)
+    {
+        throw std::runtime_error("The wrong number of bytes were written to CAN");
+        return ret;
+    };
+    this->axes[axes_ids[axisID]]->update_input_vel(input_vel, input_torque_ff);
+    return 0;
+}
+
+int OdriveCan::call_set_input_torque(int axisID, uint32_t torque)
+{
+
+    int msg_id = axisID << 5 | SET_INPUT_TORQUE; // axis ID + can msg name
+    std::cout << "[SetInputTorque] Ask to set input torque - CAN msg ID"
+              << std::hex << msg_id << std::dec << std::endl;
+
+    char data[4];
+    this->get_char_from_num<uint32_t>(data, torque);
+
+    int ret = can_dev->send(msg_id, canMsgLen[SET_INPUT_TORQUE], data, true);
+
+    if (ret < 0)
+    {
+        throw std::runtime_error("The wrong number of bytes were written to CAN");
+        return ret;
+    };
+
+    this->axes[axes_ids[axisID]]->update_input_torque(torque);
+
+    return 0;
+};
+
+int OdriveCan::call_set_limits(int axisID, uint32_t velocity, uint32_t current)
+{
+    int msg_id = axisID << 5 | SET_LIMITS; // axis ID + can msg name
+    std::cout << "[SetLimits] Ask to set velocity and current limits - CAN msg ID"
+              << std::hex << msg_id << std::dec << std::endl;
+
+    char data[8];
+    this->get_char_from_nums<uint32_t>(data, velocity, current);
+
+    int ret = can_dev->send(msg_id, canMsgLen[SET_LIMITS], data, true);
+
+    if (ret < 0)
+    {
+        throw std::runtime_error("The wrong number of bytes were written to CAN");
+        return ret;
+    };
+
+    this->axes[axes_ids[axisID]]->update_limits(velocity, current);
+
+    return 0;
+};
+
+int OdriveCan::call_start_anticogging(int axisID) { 
+    int msg_id = axisID << 5 | START_ANTICOGGING; // axis ID + can msg name
+    std::cout << "[Anticogging] Ask to start anticogging" << std::hex
+              << msg_id << std::dec << std::endl;
+
+    int ret = can_dev->send(msg_id, canMsgLen[START_ANTICOGGING]);
+
+    if (ret < 0)
+    {
+        throw std::runtime_error("The wrong number of bytes were written to CAN");
+        return ret;
+    }
+    
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    this->axes[axes_ids[axisID]]->update_anticogging(tv);
+
     return 0;
  };
 
-int OdriveCan::call_set_input_vel(int axisID) { return 0; };
+int OdriveCan::call_set_traj_vel_limit(int axisID, uint32_t lim)
+{
+    int msg_id = axisID << 5 | SET_TRAJ_VEL_LIMIT; // axis ID + can msg name
+    std::cout << "[SetLimits] Ask to set velocity and current limits - CAN msg ID"
+              << std::hex << msg_id << std::dec << std::endl;
 
-int OdriveCan::call_set_input_torque(int axisID) { return 0; };
+    char data[4];
+    this->get_char_from_num<uint32_t>(data, lim);
 
-int OdriveCan::call_set_limits(int axisID) { return 0; };
+    int ret = can_dev->send(msg_id, canMsgLen[SET_TRAJ_VEL_LIMIT], data, true);
 
-int OdriveCan::call_start_anticogging(int axisID) { return 0; };
+    if (ret < 0)
+    {
+        throw std::runtime_error("The wrong number of bytes were written to CAN");
+        return ret;
+    };
 
-int OdriveCan::call_set_teaj_vel_limit(int axisID) { return 0; };
+    this->axes[axes_ids[axisID]]->update_traj_vel_limit(lim);
 
-int OdriveCan::call_set_traj_accel_limits(int axisID) { return 0; };
+    return 0;
+};
 
-int OdriveCan::call_set_traj_inertia(int axisID) { return 0; };
+int OdriveCan::call_set_traj_accel_limits(int axisID, uint32_t accel, uint32_t decel)
+{
+    int msg_id = axisID << 5 | SET_TRAJ_ACCEL_LIMITS; // axis ID + can msg name
+    std::cout << "[SetAccelLimits] Ask to set trajectory acceleration and decellerations limits - CAN msg ID"
+              << std::hex << msg_id << std::dec << std::endl;
+
+    char data[8];
+    this->get_char_from_nums<uint32_t>(data, accel, decel);
+
+    int ret = can_dev->send(msg_id, canMsgLen[SET_TRAJ_ACCEL_LIMITS], data, true);
+
+    if (ret < 0)
+    {
+        throw std::runtime_error("The wrong number of bytes were written to CAN");
+        return ret;
+    };
+
+    this->axes[axes_ids[axisID]]->update_traj_accel_limit(accel, decel);
+
+    return 0;
+};
+
+int OdriveCan::call_set_traj_inertia(int axisID, uint32_t inertia)
+{
+
+    int msg_id = axisID << 5 | SET_TRAJ_INERTIA; // axis ID + can msg name
+    std::cout << "[SetAccelLimits] Ask to set trajectory acceleration and decellerations limits - CAN msg ID"
+              << std::hex << msg_id << std::dec << std::endl;
+
+    char data[4];
+    this->get_char_from_num<uint32_t>(data, inertia);
+
+    int ret = can_dev->send(msg_id, canMsgLen[SET_TRAJ_INERTIA], data, true);
+
+    if (ret < 0)
+    {
+        throw std::runtime_error("The wrong number of bytes were written to CAN");
+        return ret;
+    };
+
+    this->axes[axes_ids[axisID]]->update_traj_inertia(inertia);
+
+    return 0;
+};
 
 int OdriveCan::call_get_iq(int axisID)
 {
@@ -546,7 +690,26 @@ int OdriveCan::call_get_tempterature(int axisID)
     return 0;
 };
 
-int OdriveCan::call_reboot(int axisID) { return 0; };
+int OdriveCan::call_reboot(int axisID) { 
+    int msg_id = axisID << 5 | REBOOT; // axis ID + can msg name
+    std::cout << "[Reboot] Ask to reboot" << std::hex
+              << msg_id << std::dec << std::endl;
+
+    int ret = can_dev->send(msg_id, canMsgLen[REBOOT]);
+
+    if (ret < 0)
+    {
+        throw std::runtime_error("The wrong number of bytes were written to CAN");
+        return ret;
+    }
+    
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    this->axes[axes_ids[axisID]]->update_reboot_timestamp(tv);
+
+    return 0;
+
+};
 
 int OdriveCan::call_get_bus_ui(int axisID)
 {
@@ -567,13 +730,89 @@ int OdriveCan::call_get_bus_ui(int axisID)
     return 0;
 };
 
-int OdriveCan::call_clear_errors(int axisID) { return 0; };
+int OdriveCan::call_clear_errors(int axisID) { 
 
-int OdriveCan::call_set_absolute_position(int axisID) { return 0; };
+    int msg_id = axisID << 5 | CLEAR_ERRORS; // axis ID + can msg name
+    std::cout << "[Reboot] Ask to clear errors" << std::hex
+              << msg_id << std::dec << std::endl;
 
-int OdriveCan::call_set_pos_gain(int axisID) { return 0; };
+    int ret = can_dev->send(msg_id, canMsgLen[CLEAR_ERRORS]);
 
-int OdriveCan::call_set_vel_gains(int axisID) { return 0; };
+    if (ret < 0)
+    {
+        throw std::runtime_error("The wrong number of bytes were written to CAN");
+        return ret;
+    }
+
+    return 0;
+ };
+
+int OdriveCan::call_set_absolute_position(int axisID, uint32_t pos)
+{
+    int msg_id = axisID << 5 | SET_ABSOLUTE_POSITION; // axis ID + can msg name
+    std::cout << "[SetAbsolutePos] Ask to set absolute position to " << (unsigned)pos << " - CAN msg ID"
+              << std::hex << msg_id << std::dec << std::endl;
+
+    char data[4];
+    this->get_char_from_num<uint32_t>(data, pos);
+
+    int ret = can_dev->send(msg_id, canMsgLen[SET_ABSOLUTE_POSITION], data, true);
+
+    if (ret < 0)
+    {
+        throw std::runtime_error("The wrong number of bytes were written to CAN");
+        return ret;
+    };
+
+    this->axes[axes_ids[axisID]]->update_absolut_pos(pos);
+
+    return 0;
+};
+
+int OdriveCan::call_set_pos_gain(int axisID, uint32_t gain)
+{
+    int msg_id = axisID << 5 | SET_POS_GAIN; // axis ID + can msg name
+    std::cout << "[SetPositionGain] Ask to set position gain " << (unsigned)gain << " - CAN msg ID"
+              << std::hex << msg_id << std::dec << std::endl;
+
+    char data[4];
+    this->get_char_from_num<uint32_t>(data, gain);
+
+    int ret = can_dev->send(msg_id, canMsgLen[SET_POS_GAIN], data, true);
+
+    if (ret < 0)
+    {
+        throw std::runtime_error("The wrong number of bytes were written to CAN");
+        return ret;
+    };
+
+    this->axes[axes_ids[axisID]]->update_pos_gain(gain);
+
+    return 0;
+};
+
+int OdriveCan::call_set_vel_gains(int axisID, uint32_t gain, uint32_t integrator)
+{
+    int msg_id = axisID << 5 | SET_VEL_GAINS; // axis ID + can msg name
+    std::cout << "[SetVelocityGain] Ask to set velocity gain " << (unsigned)gain << ", integrator gain "
+              << unsigned(integrator) << " - CAN msg ID"
+              << std::hex << msg_id << std::dec << std::endl;
+
+    char data[8];
+    this->get_char_from_nums<uint32_t>(data, gain, integrator);
+
+    int ret = can_dev->send(msg_id, canMsgLen[SET_VEL_GAINS], data, true);
+
+    if (ret < 0)
+    {
+        throw std::runtime_error("The wrong number of bytes were written to CAN");
+        return ret;
+    };
+
+    this->axes[axes_ids[axisID]]->update_vel_gains(gain, integrator);
+
+    return 0;
+};
 
 int OdriveCan::call_get_adc_voltage(int axisID)
 {
@@ -612,4 +851,18 @@ int OdriveCan::call_get_controller_Error(int axisID)
     return 0;
 };
 
-int OdriveCan::call_enter_dfu_mode(int axisID) { return 0; };
+int OdriveCan::call_enter_dfu_mode(int axisID) { 
+    int msg_id = axisID << 5 | ENTER_DFU_MODE; // axis ID + can msg name
+    std::cout << "[DFU] Ask to enter DFU mode" << std::hex
+              << msg_id << std::dec << std::endl;
+
+    int ret = can_dev->send(msg_id, canMsgLen[ENTER_DFU_MODE]);
+
+    if (ret < 0)
+    {
+        throw std::runtime_error("The wrong number of bytes were written to CAN");
+        return ret;
+    }
+
+    return 0;
+};

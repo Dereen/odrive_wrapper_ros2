@@ -57,7 +57,7 @@ typedef struct
     // set_limits
     uint32_t velocity_limit;
     uint32_t current_limit;
-    bool start_anticogging;
+    struct timeval  anticogging_timestamp;
     // set_input_pos
     uint32_t input_pos;
     float vel_ff;
@@ -74,6 +74,8 @@ typedef struct
     uint32_t traj_decel_limit;
     // set_traj_inertia
     uint32_t traj_inertia;
+
+    struct timeval timestamp;
 
 } axisRegSettings;
 
