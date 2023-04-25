@@ -1,8 +1,29 @@
 # Wrapper Odrive S1/PRO
 napajeni  24 V  
 nastaven bitrate 500 000  
+
+## Aktivace CAN interface
+Pred spustenim kodu musi se nakonfigurovat port pro prijimac.   
+
+```
 sudo ip link set can0 type can bitrate 500000  
 sudo ip link set up can0  
+```
+
+Da se pozmenit nastaveni v `sudo nano /etc/network/interfaces`.
+```
+auto can0
+  iface can0 inet manual
+  pre-up /sbin/ip link set can0 type can bitrate 500000
+  up /sbin/ifconfig can0 up
+  down /sbin/ifconfig can0 down 
+```
+
+Nebo, se musi pridat uzivateli moznost spoustet sudo prikazy bez hesla  
+
+`echo "$USER ALL=(ALL:ALL) NOPASSWD: ALL" | sudo tee "/etc/sudoers.d/dont-prompt-$USER-for-sudo-password"`
+
+
 
 ## Požadavky před spuštěním
 Na Usb2CAN tripele má být spušten adapter _triple_.
@@ -198,5 +219,6 @@ Set_Pos_Gain
 Set_Vel_gains  
 - axis.controller_.config_.vel_gain
 - axis.controller_.config_.vel_integrator_gain
+
 
 

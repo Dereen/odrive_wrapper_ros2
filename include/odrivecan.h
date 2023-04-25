@@ -31,7 +31,6 @@ struct updatePeriods
     uint32_t busIU;     /*!<  bus current bus voltage */
 };
 
-#define CAN_MSGS_LEN 8, 7, 0, 8, 4, 4, 8, 8, 8, 8, 4, 8, 0, 4, 8, 4, 8, 8, 0, 8, 0, 4, 4, 8, 4, 4, 0
 
 /**
  * @brief A class for communicating with odrive axes by CAN messges.
@@ -55,32 +54,40 @@ class OdriveCan : OdriveAxis
     } canMsg;
 
 public:
-    std::shared_ptr<struct updatePeriods> periods; /*!< time constants at which the periodically updated data will be fetched */
-
-    const int canMsgLen[28];
+    std::unique_ptr<struct updatePeriods> periods; /*!< time constants at which the periodically updated data will be fetched */
 
     friend std::ostream &operator<<(std::ostream &out, OdriveCan const *oc);
 
     int get_axes_num();
 
 private:
+    std::unordered_map<int, int> canMsgLen;
     int axes_num;
     std::vector<std::shared_ptr<class OdriveAxis>> axes;
     std::unordered_map<int, int> axes_ids;  /*!< Maps axis ID to index in axes vector */
 
-
     int buffer_len;
     typedef boost::circular_buffer<canMsg> can_circ_buffer;
-    std::vector<std::shared_ptr<can_circ_buffer>> input_buffer; // make a circular buffer for each axis
+    std::vector<std::unique_ptr<can_circ_buffer>> input_buffer; // make a circular buffer for each axis
 
     std::unique_ptr<CanDevice> can_dev;
 
     bool run;
 
     std::mutex msg_mutex;
+    std::mutex send_mutex;
 
     std::thread th_recieve;
     std::thread th_process;
+    std::thread th_send;
+    std::thread th_errors;
+
+    int update_period_us;
+    int err_update_period_us;
+
+    long bit_rate;  // can bitrate
+
+    std::string dev_name;  // conencted device's system name
 
     enum
     {
@@ -117,13 +124,13 @@ private:
 
 public:
 
-    OdriveCan() : canMsgLen{CAN_MSGS_LEN}, axes_num(6), buffer_len(10), run(1)
+    OdriveCan() : axes_num(6), buffer_len(10), run(1), update_period_us(100000), err_update_period_us(10000)
     {
         std::cout << "[OdriveCAN] Init Ordive can constructor" << std::endl;
         this->init();
     };
 
-    OdriveCan(int axes_num) : canMsgLen{CAN_MSGS_LEN}, axes_num(axes_num), buffer_len(10), run(1)
+    OdriveCan(int axes_num) :  axes_num(axes_num), buffer_len(10), run(1), update_period_us(100000),  err_update_period_us(10000)
     {
         this->init();
     };
@@ -132,6 +139,8 @@ public:
     {
         th_recieve.join();
         th_process.join();
+        th_send.join();
+        th_errors.join();
     };
 
     /**
@@ -168,6 +177,10 @@ public:
     int axis_from_header(uint32_t header);
 
     bool check_msg_error(uint32_t header);
+
+    void get_errors();
+
+    void ask_for_current_values();
 
     /**
      * @brief recieves can messages and stores them in circluar buffers for each axis
@@ -219,9 +232,9 @@ public:
      * @param[in] axisID 
      * @return int returns -1 at failure, 0 at sucess
      */
-    int call_get_version(int axisID);
+    int call_get_version(int axisID); // NOK returns error - probably not implemented in odrive
 
-    int call_estop(int axisID);
+    int call_estop(int axisID);  // OK
 
     int call_get_error(int axisID);
 
@@ -251,11 +264,11 @@ public:
 
     int call_get_iq(int axisID);
 
-    int call_get_tempterature(int axisID);
+    int call_get_tempterature(int axisID); // OK  -returns FET temperature
 
     int call_reboot(int axisID);
 
-    int call_get_bus_ui(int axisID);
+    int call_get_bus_ui(int axisID);  // OK - returns voltage
 
     int call_clear_errors(int axisID);
 
@@ -267,7 +280,7 @@ public:
 
     int call_get_adc_voltage(int axisID);
 
-    int call_get_controller_Error(int axisID);
+    int call_get_controller_error(int axisID);
 
     int call_enter_dfu_mode(int axisID);
 

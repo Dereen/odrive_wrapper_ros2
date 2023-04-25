@@ -26,15 +26,17 @@ int CanDevice::send(uint16_t id, uint16_t dlc, char * data, bool rtr)
 	f.can_dlc = dlc;
 
 	if (data)	{ // fill data
-		std::cout << "fill input data" << std::endl;
+		//std::cout << "fill input data" << std::endl;
 		for (int i =0; i< dlc; i++){
 			f.data[i] = data[i];
 			}
 		}
 
 	// write created can message
-	if (write(s, &f, sizeof(struct can_frame)) != sizeof(struct can_frame))	{
-		perror("Write error");
+	int ret = write(s, &f, sizeof(struct can_frame)) ;
+	if (ret != sizeof(struct can_frame))	{
+		perror("[CanDev] Write error");
+		std::cout << "wrote " << ret << "bytes\n";
 		return -1;
 	}
 
@@ -55,14 +57,18 @@ int CanDevice::send(uint16_t id, uint16_t dlc, bool rtr)
 {
 
 	struct can_frame f;
+
+	//memset(&f, 0, sizeof(struct can_frame));
 	// define can frame header
 	f.can_id = rtr ? id + CAN_RTR_FLAG : id;
 	f.can_dlc = dlc;
 	memset(f.data, 0, dlc);
 
 	// write created can message
-	if (write(s, &f, sizeof(struct can_frame)) != sizeof(struct can_frame))	{
-		perror("Write error");
+	int ret = write(s, &f, sizeof(struct can_frame)) ;
+	if (ret != sizeof(struct can_frame))	{
+		perror("[CanDev] Write error");
+		std::cout << "wrote " << ret << "bytes\n";
 		return -1;
 	}
 
@@ -95,7 +101,7 @@ int CanDevice::set_filter(uint16_t id, uint16_t mask)
 	nbytes = read(s, &frame, sizeof(struct can_frame));
 
 	if (nbytes < 0)	{
-		perror("Read error");
+		perror("[CanDev] Read error");
 		return 1;
 	}
 
@@ -124,7 +130,7 @@ int CanDevice::recieve(struct can_frame *frame, struct timeval * timestamp, int 
 
 		int error = ioctl(s, SIOCGSTAMP, timestamp);
 		if (error < 0){
-			perror("Read error");
+			perror("[CanDev] Read error");
 			return 1;
 		}
 	}
@@ -149,7 +155,7 @@ int CanDevice::init_connection()
 	std::cout << "[CanDev] Init connection" << std::endl;
 
 	if ((this->s = socket(PF_CAN, SOCK_RAW, CAN_RAW)) < 0){
-		perror("Socket error");
+		perror("[CanDev] Socket error");
 		return 1;
 	}
 

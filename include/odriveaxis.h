@@ -15,6 +15,7 @@
 #include <iostream>
 #include "candevice.h"
 #include "datastructs.h"
+#include "odriveenums.h"
 
 class OdriveAxis
 {
@@ -24,15 +25,15 @@ private:
     // set_axis_node_id
     int id; /*!< Axis ID */
 
-    std::shared_ptr<axisVersion> ver;       /*!< stores version information */
-    std::shared_ptr<axisErrors> err;        /*!< stores errors information */
-    std::shared_ptr<gains> gain;            /*!< stores gains*/
-    std::shared_ptr<tempStruct> temp;       /*!< stores temperature measurements*/
-    std::shared_ptr<encoderStruct> encoder; /*!< stores encoder estimates */
-    std::shared_ptr<iqStruct> iq;           /*!< stores iq measurements*/
-    std::shared_ptr<busUI> ui;              /*!< stores bus's voltage and current measurements*/
-    std::shared_ptr<axisState> state;       /*!< stores axis state*/
-    std::shared_ptr<adcVoltage> adc;        /*!< stores ADC voltage measurements*/
+    std::unique_ptr<axisVersion> ver;       /*!< stores version information */
+    std::unique_ptr<axisErrors> err;        /*!< stores errors information */
+    std::unique_ptr<gains> gain;            /*!< stores gains*/
+    std::unique_ptr<tempStruct> temp;       /*!< stores temperature measurements*/
+    std::unique_ptr<encoderStruct> encoder; /*!< stores encoder estimates */
+    std::unique_ptr<iqStruct> iq;           /*!< stores iq measurements*/
+    std::unique_ptr<busUI> ui;              /*!< stores bus's voltage and current measurements*/
+    std::unique_ptr<axisState> state;       /*!< stores axis state*/
+    std::unique_ptr<adcVoltage> adc;        /*!< stores ADC voltage measurements*/
     std::unique_ptr<axisRegSettings> reg;   /*!< stores regulator settings*/
 
     // set_axis_state
@@ -45,7 +46,7 @@ private:
     struct timeval reboot_timestamp;
 
     // estop
-    bool estop;
+    struct timeval estop;
 
     /**
      * @brief Function used to default initialization of OdriveAxis
@@ -169,6 +170,8 @@ public:
 
     uint32_t get_axis_requested_state();
 
+    int get_axis_id();
+
     void update_controller_mode(uint32_t control_mode, uint32_t input_mode);
 
     uint32_t get_controll_mode();
@@ -197,7 +200,9 @@ public:
 
     void update_anticogging(struct timeval b);
 
-    void update_estop(bool b);
+    void update_estop(struct timeval b);
 
     void update_reboot_timestamp(struct timeval stamp);
+
+    void update_controller_timestamp(struct timeval t);
 };

@@ -11,33 +11,92 @@
 
 #include "odriveaxis.h"
 
+std::map<uint8_t, std::string> axis_state_map = {
+    {AXIS_STATE_UNDEFINED, "undefined"},
+    {AXIS_STATE_IDLE, "idle"},
+    {AXIS_STATE_STARTUP_SEQUENCE, "startup sequence"},
+    {AXIS_STATE_FULL_CALIBRATION_SEQUENCE, "callibration sequence"},
+    {AXIS_STATE_MOTOR_CALIBRATION, "motor callibration"},
+    {AXIS_STATE_ENCODER_INDEX_SEARCH, "encoder index search"},
+    {AXIS_STATE_ENCODER_OFFSET_CALIBRATION, "encoder offset callibration"},
+    {AXIS_STATE_CLOSED_LOOP_CONTROL, "closed loop control"},
+    {AXIS_STATE_LOCKIN_SPIN, "lockin spin"},
+    {AXIS_STATE_ENCODER_DIR_FIND, "encoder dir find"},
+    {AXIS_STATE_HOMING, "homing"},
+    {AXIS_STATE_ENCODER_HALL_POLARITY_CALIBRATION, "encoder polarity calibration"},
+    {AXIS_STATE_ENCODER_HALL_PHASE_CALIBRATION, "encoder hall phase calibration"}};
+
+std::map<uint8_t, std::string> control_mode_map = {
+    {CONTROL_MODE_VOLTAGE_CONTROL, "voltage control"},
+    {CONTROL_MODE_TORQUE_CONTROL, "torque control"},
+    {CONTROL_MODE_VELOCITY_CONTROL, "velocity control"},
+    {CONTROL_MODE_POSITION_CONTROL, "position control"}};
+
+std::map<uint8_t, std::string> input_mode_map = {
+    {INPUT_MODE_INACTIVE, "inactive"},
+    {INPUT_MODE_PASSTHROUGH, "passthrough"},
+    {INPUT_MODE_VEL_RAMP, "velocity ramp"},
+    {INPUT_MODE_POS_FILTER, "position filter"},
+    {INPUT_MODE_MIX_CHANNELS, "mix channels"},
+    {INPUT_MODE_TRAP_TRAJ, "trap trajectory"},
+    {INPUT_MODE_TORQUE_RAMP, "torque ramp"},
+    {INPUT_MODE_MIRROR, "mirror"},
+    {INPUT_MODE_TUNING, "tuning"}};
+
+std::map<uint8_t, std::string> odrive_error_map = {
+    {ODRIVE_ERROR_NONE, "none"},
+    {ODRIVE_ERROR_CONTROL_ITERATION_MISSED, "control iteration missed"},
+    {ODRIVE_ERROR_DC_BUS_UNDER_VOLTAGE, "DC bus undervoltage"},
+    {ODRIVE_ERROR_DC_BUS_OVER_VOLTAGE, "DC bus overvoltage"},
+    {ODRIVE_ERROR_DC_BUS_OVER_REGEN_CURRENT, "DC bus over regen current"},
+    {ODRIVE_ERROR_DC_BUS_OVER_CURRENT, "DC bus over current"},
+    {ODRIVE_ERROR_BRAKE_DEADTIME_VIOLATION, "brake deadtime violation"},
+    {ODRIVE_ERROR_BRAKE_DUTY_CYCLE_NAN, "breake duty cycle NaN"},
+    {ODRIVE_ERROR_INVALID_BRAKE_RESISTANCE, "invalid brake resistance"}};
+
+std::map<uint8_t, std::string> axis_error_map = {
+    {AXIS_ERROR_NONE, "none"},
+    {AXIS_ERROR_INVALID_STATE, "invalid state"},
+    {AXIS_ERROR_MOTOR_FAILED, "motor failed"},
+    {AXIS_ERROR_SENSORLESS_ESTIMATOR_FAILED, "sensorless estimator failed"},
+    {AXIS_ERROR_ENCODER_FAILED, "encoder failed"},
+    {AXIS_ERROR_CONTROLLER_FAILED, "controller failed"},
+    {AXIS_ERROR_WATCHDOG_TIMER_EXPIRED, "watchdog timer expired"},
+    {AXIS_ERROR_MIN_ENDSTOP_PRESSED, "min endstop pressed"},
+    {AXIS_ERROR_MAX_ENDSTOP_PRESSED, "max endstop pressed"},
+    {AXIS_ERROR_ESTOP_REQUESTED, "estop requested"},
+    {AXIS_ERROR_HOMING_WITHOUT_ENDSTOP, "homing without endstop"},
+    {AXIS_ERROR_OVER_TEMP, "over temp"},
+    {AXIS_ERROR_UNKNOWN_POSITION, "unknown position"}};
+
 void OdriveAxis::init()
 {
+    estop.tv_sec = -1;
 
-    gain = std::make_shared<gains>();
+    gain = std::make_unique<gains>();
 
-    ver = std::make_shared<axisVersion>();
+    ver = std::make_unique<axisVersion>();
     ver->timestamp.tv_sec = -1;
 
-    err = std::make_shared<axisErrors>();
+    err = std::make_unique<axisErrors>();
     err->timestamp.tv_sec = -1;
 
-    state = std::make_shared<axisState>();
+    state = std::make_unique<axisState>();
     state->timestamp.tv_sec = -1;
 
-    iq = std::make_shared<iqStruct>();
+    iq = std::make_unique<iqStruct>();
     iq->timestamp.tv_sec = -1;
 
-    temp = std::make_shared<tempStruct>();
+    temp = std::make_unique<tempStruct>();
     temp->timestamp.tv_sec = -1;
 
-    ui = std::make_shared<busUI>();
+    ui = std::make_unique<busUI>();
     ui->timestamp.tv_sec = -1;
 
-    encoder = std::make_shared<encoderStruct>();
+    encoder = std::make_unique<encoderStruct>();
     encoder->timestamp.tv_sec = -1;
 
-    adc = std::make_shared<adcVoltage>();
+    adc = std::make_unique<adcVoltage>();
     adc->timestamp.tv_sec = -1;
 
     reg = std::make_unique<axisRegSettings>();
@@ -57,7 +116,6 @@ void OdriveAxis::set_axis_version(uint8_t hw_version_major, uint8_t hw_version_m
     this->ver->fw_version_minor = fw_version_minor;
     this->ver->fw_version_revision = fw_version_revision;
     this->ver->timestamp = timestamp;
-    std::cout << "Set axis version [" << timestamp << "] " << hw_version_major << std::endl;
 }
 
 void OdriveAxis::set_axis_state(uint8_t error, uint8_t state, uint8_t procedure_result,
@@ -119,6 +177,10 @@ void OdriveAxis::update_controller_err(uint32_t error, struct timeval timestamp)
     this->err->timestamp = timestamp;
 }
 
+std::string italic(std::string s){
+    return "\e[3m" + s + "\e[0m";
+}
+
 std::ostream &operator<<(std::ostream &out, OdriveAxis const *ax)
 {
     // print Odrive version
@@ -134,14 +196,16 @@ std::ostream &operator<<(std::ostream &out, OdriveAxis const *ax)
     out << "Axis status [" << ax->state->timestamp << "]:" << std::endl;
     if (ax->state->timestamp.tv_sec > -1)
     {
-        out << "\tAxis state:" << (unsigned)ax->state->ax_state << std::endl;
+        out << "\tAxis state: " << axis_state_map[(unsigned)ax->state->ax_state] << std::endl;
         out << "\tProcedure result: " << (unsigned)ax->state->procedure_result << std::endl;
         out << "\tTrajectory done: " << (ax->state->trajectory_done_flag ? "yes" : "no") << std::endl;
-        if (ax->err->axis_error)
+
+        if (ax->err->timestamp.tv_sec > -1)
         {
-            out << "\tERROR" << std::endl;
-            out << "\tActive errors: " << (unsigned)ax->err->active_errors << std::endl;
+            out << "Errors [" << ax->err->timestamp << "]:\n";
+            out << "\tActive errors: " << odrive_error_map[ax->err->active_errors] << std::endl;
             out << "\tDisarm reason: " << (unsigned)ax->err->disarm_reason << std::endl;
+            out << "\tAxis errors: " << axis_error_map[ax->err->axis_error] << std::endl;
             out << "\tController error: " << (unsigned)ax->err->controller_error << std::endl;
         }
     }
@@ -170,28 +234,38 @@ std::ostream &operator<<(std::ostream &out, OdriveAxis const *ax)
         out << "\tBus voltage: " << (unsigned)ax->ui->bus_voltage << std::endl;
     }
 
+        if (ax->iq->timestamp.tv_sec > -1)
+    {
+        out << "Motor current [" << ax->iq->timestamp << "]:" << std::endl;
+        out << "\tCommanded: " << (unsigned)ax->iq->iq_setpoint << std::endl;
+        out << "\tMeasured: " << (unsigned)ax->iq->iq_measured << std::endl;
+    }
+
     // ADC voltage
     if (ax->adc->timestamp.tv_sec > -1)
         out << "ADC voltage[" << ax->adc->timestamp << "]: " << (unsigned)ax->adc->adc_voltage << std::endl;
 
-    //Regulator settings
+    // Regulator settings
     if (ax->reg->timestamp.tv_sec > -1)
     {
-        out << "Regulator settings[" << ax->reg->timestamp << "]: " << std::endl;
-        out << "\tController mode: *Control mode " << (unsigned)ax->reg->control_mode << " *Input mode "
-            << (unsigned)ax->reg->input_mode << std::endl;
-        out << "\tLimits: *Velocity " << (unsigned)ax->reg->velocity_limit << " *Current "
+        out << "Regulator settings [" << ax->reg->timestamp << "]: " << std::endl;
+        out << "\tController mode: *"<< italic("Control mode: ") << control_mode_map[ax->reg->control_mode] << ", *"<< italic("Input mode: ")
+            << input_mode_map[ax->reg->input_mode] << std::endl;
+        out << "\tLimits: *" << italic("Velocity: ") << (unsigned)ax->reg->velocity_limit << ", *" << italic("Current: ")
             << (unsigned)ax->reg->current_limit << std::endl;
         out << "\tAnticogging is  " << (ax->reg->anticogging_timestamp.tv_sec > 0 ? "activated" : "deactivated") << std::endl;
-        out << "\tInput position: *Input position " << (unsigned)ax->reg->input_pos << " *Vel FF "
-            << ax->reg->vel_ff << " *Torque FF " << ax->reg->torque_ff << std::endl;
-        out << "\tInput velocity: *Input vel " << (unsigned)ax->reg->input_vel << " *Input torque FF "
+        out << "\tInput position: *" << italic("Input position: ") << (unsigned)ax->reg->input_pos << ", *" << italic("Vel FF: ")
+            << ax->reg->vel_ff << " *" << italic("Torque FF: ") << ax->reg->torque_ff << std::endl;
+        out << "\tInput velocity: *" << italic("Input vel: ") << (unsigned)ax->reg->input_vel << ", *" << italic("Input torque FF: ")
             << (unsigned)ax->reg->input_torque_ff << std::endl;
-        out << "\t Input torque: " << (unsigned)ax->reg->input_torque << std::endl;
-        out << "\t Trajectory limits: *Velocity" << (unsigned)ax->reg->traj_vel_limit << " *Acceleration "
-            << (unsigned)ax->reg->traj_accel_limit << " *Deceleration" << (unsigned)ax->reg->traj_decel_limit << std::endl;
-        out << "\tTrajectory inertia: " << (unsigned) ax->reg->traj_inertia << std::endl;  
+        out << "\tInput torque: " << (unsigned)ax->reg->input_torque << std::endl;
+        out << "\tTrajectory limits: *"<<italic("Velocity: ") << (unsigned)ax->reg->traj_vel_limit << ", *" << italic("Acceleration: ")
+            << (unsigned)ax->reg->traj_accel_limit << ", *" << italic("Deceleration: ") << (unsigned)ax->reg->traj_decel_limit << std::endl;
+        out << "\tTrajectory inertia: " << (unsigned)ax->reg->traj_inertia << std::endl;
     }
+
+    if (ax->estop.tv_sec > 0)
+        out << "Estop was called [" << ax->estop << "]: " << std::endl;
 
     return out;
 }
@@ -227,59 +301,77 @@ void OdriveAxis::update_input_pos(uint32_t input_pos, float vel_ff, float torque
     this->reg->input_pos = input_pos;
     this->reg->vel_ff = vel_ff;
     this->reg->torque_ff = torque_ff;
-    
 };
 
-void OdriveAxis::update_input_vel(uint32_t input_vel, uint32_t input_torque_ff){
+void OdriveAxis::update_input_vel(uint32_t input_vel, uint32_t input_torque_ff)
+{
     this->reg->input_vel = input_vel;
     this->reg->input_torque_ff = input_torque_ff;
-
 }
 
-void OdriveAxis::update_input_torque(uint32_t input_torque){
+void OdriveAxis::update_input_torque(uint32_t input_torque)
+{
     this->reg->input_torque = input_torque;
 }
 
-void OdriveAxis::update_limits(uint32_t velocity, uint32_t current){
+void OdriveAxis::update_limits(uint32_t velocity, uint32_t current)
+{
     this->reg->velocity_limit = velocity;
     this->reg->current_limit = current;
 }
 
-void OdriveAxis::update_traj_vel_limit(uint32_t lim){
+void OdriveAxis::update_traj_vel_limit(uint32_t lim)
+{
     this->reg->traj_vel_limit = lim;
 }
 
-void OdriveAxis::update_traj_accel_limit(uint32_t accel, uint32_t decel){
+void OdriveAxis::update_traj_accel_limit(uint32_t accel, uint32_t decel)
+{
     this->reg->traj_accel_limit = accel;
     this->reg->traj_decel_limit = decel;
 }
 
-void OdriveAxis::update_traj_inertia(uint32_t inertia){
+void OdriveAxis::update_traj_inertia(uint32_t inertia)
+{
     this->reg->traj_inertia = inertia;
 }
 
-void OdriveAxis::update_absolut_pos(uint32_t pos){
+void OdriveAxis::update_absolut_pos(uint32_t pos)
+{
     this->position = pos;
 }
 
-void OdriveAxis::update_pos_gain(uint32_t gain){
+void OdriveAxis::update_pos_gain(uint32_t gain)
+{
     this->gain->pos_gain = gain;
 }
 
-void OdriveAxis::update_vel_gains(uint32_t gain, uint32_t integrator_gain){
+void OdriveAxis::update_vel_gains(uint32_t gain, uint32_t integrator_gain)
+{
     this->gain->vel_gain = gain;
     this->gain->vel_integrator_gain = integrator_gain;
 }
 
-void OdriveAxis::update_estop(bool b){
+void OdriveAxis::update_estop(struct timeval b)
+{
     this->estop = b;
 }
 
-void OdriveAxis::update_anticogging(struct timeval b){
+void OdriveAxis::update_anticogging(struct timeval b)
+{
     this->reg->anticogging_timestamp = b;
 }
 
-void OdriveAxis::update_reboot_timestamp(struct timeval stamp){
+void OdriveAxis::update_reboot_timestamp(struct timeval stamp)
+{
     this->reboot_timestamp = stamp;
 }
 
+int OdriveAxis::get_axis_id()
+{
+    return this->id;
+}
+
+void OdriveAxis::update_controller_timestamp(struct timeval t){
+    this->reg->timestamp = t;
+}
