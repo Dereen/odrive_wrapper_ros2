@@ -30,6 +30,13 @@ Na Usb2CAN tripele má být spušten adapter _triple_.
 ```sh ./triple.sh ```
 Dá se ověřit, že nstavení proběhlo správně přes ```candump canX```, kde ```X``` je cislo portu, na který je can na převodníku připojen.
 
+## Nalezene bugy v odrive
+- pri nastavovani Axis ID pomoci odrivetool si sice zapamatuje na jakem ID ma vysilat, ovsem do ulozeni a restartu odmita prijimat zpravy
+- neodpovida na zpravu Get Version
+- pri jakekoli chybe nepouzije standardni Can protokol, kdy se do CAN ID prida flag, ale odesla zpravu vyplenou nulami, coz odpovida Axis0_Get_version
+- Get_Bus_Voltage_Current odpovida pouze na voltage
+    - i kdyz ze seznamu se hodnota tvari jako unit32, jedna se o float
+
 ## Specifikace C++ interface pro ODrive
 Dokumentace pro ODrive, kde lze dohledat všechny následující parametry zmíněné v tomto dokumentu
 https://docs.odriverobotics.com/v/latest/fibre_types/com_odriverobotics_ODrive.html
@@ -47,15 +54,13 @@ Základní potřebné informace funkcionality dostupné z C++, všechny ostatní
 - `Potřeba nastavovat/volat opakovaně`
 
 **Informace o ODrive**
-- [ ] __serial_number__ - neni soucasti CAN protokolu
-- [ ] __hw_version_major__- neni soucasti
-- [ ] __hw_version_minor__- neni soucasti
-- [ ] __hw_version_variant__- neni soucasti
-- [ ] __fw_version_major__- neni soucasti
-- [ ] __fw_version_minor__ - neni soucasti
-- [ ] __fw_version_revision__- neni soucasti
-- [ ] __commit_hash__ - neni soucasti
-- [ ] `reboot`
+- Informace o verzi je nedostupna v soucasne implementaci simpleCAN od odrive
+
+**Informace o ose**
+- *AxisState* - aktuální stav driveru (idle, closed_loop_ctrl,...)
+- *Trajectory done flag*
+- *Procedure result*
+- *set axis state*
 
 **CAN**
 - [ ] *Can.error*
@@ -63,74 +68,66 @@ Základní potřebné informace funkcionality dostupné z C++, všechny ostatní
 - [ ] *Can.n_rx*
 
 **Chybové stavy ODrive**
-- [ ] *Issues* - Chyby celého ODrive
-- [ ] *Misconfigured* - Signalize že je ODrive správně nakonfigurován- neni soucasti
-- [ ] `Clear_errors` - Smazání chyb
+- *Active errors* - Chyby (asi celého) ODrive
+- *Disarm reason* - 
+- *Axis error* - Chyba osy
+- *Controller error*
+-  `Clear_errors` - Smazání chyb
 
 **Spotřeba ODrive**
-- [ ] *Ibus* - Proud odebíraný ODrivem
-- [ ] *Vbus_voltage* - Vstupní napětí ODrive
-
-**Ovládání stav**
-- [ ] *Axis.active_errors* - Aktivní chyby motoru
-- [ ] *Axis.disarm_reason* - Chyby které způsobily zastavení motoru- neni soucasti
-- [ ] *Axis.last_drv_fault*  - Poslední chyba driveru- neni soucasti
-- [ ] *Axis.AxisState* - aktuální stav driveru (idle, closed_loop_ctrl,...)
+-  *bus current* - Proud odebíraný ODrivem, dle zkousky nefunkcni
+-  *bus voltage* - Vstupní napětí ODrive, ve floatech
+- *ADC voltage*
 
 **Nastavení pozice motoru**
-- [ ] `Axis.set_abs_pos` - Nastavení absolutní pozice motoru
+- `set absolute position` - Nastavení absolutní pozice motoru
+
+**Nastavení limitů**
+- `velocity limit`
+- `current limit`
 
 **Nastavení regulačního módu**
-- [ ] `Axis.controller.config.control_mode` - Nastavení regulačního modu
-- [ ] `Axis.controller.config.input_mode` - Nastavení typu regulační modu
+- `control_mode` - Nastavení regulačního modu
+- `input_mode` - Nastavení typu regulační modu
 
 **Rychlostní regulační mód**
-- [ ] `Axis.controller.config.vel_ramp_rate` - Nastaveni zrychlení rychlostní rampy
-- [ ] `Axis.controller.input_vel` - Nastavení rychlostního setpointu
+- `input velocity` - Nastavení rychlostního setpointu
+- `input torque feed forward`
+- `velocity gain`
+- `velocity integrator gain`
 
 **Poziční regulační mód**
-- [ ] `Axis.trap_traj.config.vel_limit` - Maximální rychlosti pro poziční regulaci
-- [ ] `Axis.trap_traj.config.accel_limit` - Maximální zrychlení poziční regulaci
-- [ ] `Axis.trap_traj.config.decel_limit` - Maximální zpomalení poziční regulaci
-- [ ] `Axis.controller.input_pos` - Nastavení pozičního setpointu
-- [ ] *Axis.controller.trajectory_done* - Nastaveni pozicního setpointu
+- `traj_vel_limit` - Maximální rychlosti pro poziční regulaci
+- `accel_limit` - Maximální zrychlení poziční regulaci
+- `decel_limit` - Maximální zpomalení poziční regulaci
+- `traj_inertia`
+- `input_pos` - Nastavení pozičního setpointu
+- `velocity feed forward`
+- `torque feed forward` 
+- `position gain`
 
-**Momentový regulační mód**
-- [ ] `Axis.controller.config.torque_ramp_rate` 
-- [ ] `Axis.controller.input_torque` - Nastavení požadovaného momentu
+**Momentový regulační mód** 
+- [ ] `input_torque` - Nastavení požadovaného momentu
 
-**Výkon motoru**
-- [ ] *Axis.controller.mechanical_power* - Mechanický výkon motoru
-- [ ] *Axis.controller.electrical_power* - Elektircký výkon motoru
+**Proud na motoru**
+- `comamnded motor current`
+- `measured motor current`
 
-**Proudy fázemi**
-- [ ] *AlphaBetaFrameController.current_meas_phA* - Změřený proud tekoucí fází A- neni soucasti
-- [ ] *AlphaBetaFrameController.current_meas_phB* - Změřený proud tekoucí fází B- neni soucasti
-- [ ] *AlphaBetaFrameController.current_meas_phC* - Změřený proud tekoucí fází C- neni soucasti
-- [ ] *AlphaBetaFrameController.current_meas_status_phA* - Status měřeného proudu - neni soucastifáze A
-- [ ] *AlphaBetaFrameController.current_meas_status_phB* - Status měřeného proudu - neni soucastifáze B
-- [ ] *AlphaBetaFrameController.current_meas_status_phC* - Status měřeného proudu - neni soucastifáze C
-- [ ] *AlphaBetaFrameController.I_bus* - Proudový odběr ODrivu
-- [ ] *AlphaBetaFrameController.Ialpha_measured* - Měřený alpha proud
-- [ ] *AlphaBetaFrameController.Ibeta_measured* - Měřený beta proud
-- [ ] *AlphaBetaFrameController.power* - Výkon dodávaný motoru ODrivem
+**Teplota**
+- *FET temperature*
+- *motor temperature*
 
-**Sledovač stavu motoru**
-- [ ] *Mapper.status* - Status sledovače stavu motoru- neni soucasti
-- [ ] *Mapper.pos_rel* - Poloha motoru- neni soucasti
-- [ ] *Mapper.pos_abs* - Absolutní poloha motoru- neni soucasti
-- [ ] *Mapper.vel* - Rychlost motoru- neni soucasti
+**Enkodery**
+- *position estimate*
+- *velocity estimate*
 
-**Teplota na ODriveru**
-- [ ] *OnboardThermistorCurrentLimiter.temperature*
-
-**Teplota na externím senzoru**
-- [ ] *OffboardThermistorCurrentLimiter.temperature*
-
-**Odpor na pálení vygenerovaného proudu**
-- [ ] *BrakeResistor.current_meas*- neni soucasti
-- [ ] *BrakeResistor.current*- neni soucasti
-- [ ] *BrakeResistor.chopper_temp*- neni soucasti
+**Další nastavení**
+- `ESTOP`
+- `start anticogging`
+- `reboot`
+- `clear errors`
+- `enter device firmware update mode`
+- `set axis node ID` - ID, kterým se identifikuje na canu
 
 
 ## “SimpleCAN” protocol:
@@ -145,22 +142,9 @@ Hearthbeat
 - axis.current_state_
 - axis.controller_.trajectory_done_
 
-Get_Motor_Error  
--axis.motor_.error_
-
-Get_Encoder_Error  
-- axsi.encoder_.error_
-
-Get_Sensorledd_Erorr  
-- axis.sensorless_estimator_.error_
-
 Get_Encoder_Estimates  
 - axis.encoder_.pos_estimate_
 - axis.encoder_.vel_estimate_
-
-Get_Encoder_Counts  
-- axis.encoder_.shadow_count_
-- axis.encoder_.count_in_cpr_
 
 Get_Iq  
 - axis.motor_.current_control_.Idq_setpoint_
@@ -172,7 +156,7 @@ Get_Sensorless_Estimates
 
 Get_Vbus_Voltage  
 - vbus_voltage
-- v popisu protokolu sice pisou ze tam je i current v kodu ani v DBC neni
+
 ### Nastavovane parametry 
 Set_Axis_Node_Id      
 - axis.config_.can.node_id  
@@ -185,7 +169,7 @@ Set_Controller_Mode
 - axis.controller_.config_.input_mode   
 
 Set_Input_Pos     
-- axis.controller_.set_input_pos_and_steps()
+- axis.controller_.set_input_pos()
 - axis.controller_.input_vel_
 - axis.controller_.input_torque_
 

@@ -181,6 +181,14 @@ std::string italic(std::string s){
     return "\e[3m" + s + "\e[0m";
 }
 
+float get_float(uint32_t f)
+{
+    static_assert(sizeof(float) == sizeof f, "`float` has a weird size.");
+    float ret;
+    std::memcpy(&ret, &f, sizeof(float));
+    return ret;
+}
+
 std::ostream &operator<<(std::ostream &out, OdriveAxis const *ax)
 {
     // print Odrive version
@@ -230,8 +238,8 @@ std::ostream &operator<<(std::ostream &out, OdriveAxis const *ax)
     if (ax->ui->timestamp.tv_sec > -1)
     {
         out << "Bus voltage and current [" << ax->ui->timestamp << "]:" << std::endl;
-        out << "\tBus current: " << (unsigned)ax->ui->bus_current << std::endl;
-        out << "\tBus voltage: " << (unsigned)ax->ui->bus_voltage << std::endl;
+        out << "\tBus current: " << get_float(ax->ui->bus_current) << std::endl;
+        out << "\tBus voltage: " << get_float(ax->ui->bus_voltage) << std::endl;
     }
 
         if (ax->iq->timestamp.tv_sec > -1)
@@ -243,7 +251,7 @@ std::ostream &operator<<(std::ostream &out, OdriveAxis const *ax)
 
     // ADC voltage
     if (ax->adc->timestamp.tv_sec > -1)
-        out << "ADC voltage[" << ax->adc->timestamp << "]: " << (unsigned)ax->adc->adc_voltage << std::endl;
+        out << "ADC voltage[" << ax->adc->timestamp << "]: " << get_float(ax->adc->adc_voltage) << std::endl;
 
     // Regulator settings
     if (ax->reg->timestamp.tv_sec > -1)

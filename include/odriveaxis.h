@@ -12,6 +12,7 @@
 #pragma once
 #include <stdint.h>
 #include <memory>
+#include <cstring>
 #include <iostream>
 #include "candevice.h"
 #include "datastructs.h"

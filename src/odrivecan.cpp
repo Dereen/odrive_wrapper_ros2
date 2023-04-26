@@ -380,9 +380,9 @@ void OdriveCan::parse_temp(int axisID, canMsg msg)
 
 void OdriveCan::parse_ui(int axisID, canMsg msg)
 {
-    // for (int i = 0; i < 8; i++)
-    //     std::cout << (unsigned)msg.frame.data[i] << " ";
-    // std::cout << std::endl;
+     for (int i = 0; i < 8; i++)
+         std::cout << (unsigned)msg.frame.data[i] << " ";
+     std::cout << std::endl;
     uint32_t voltage = get32from8(msg.frame.data, 0);
     uint32_t current = get32from8(msg.frame.data, 4);
     axes[axisID]->update_ui(voltage, current, msg.timestamp);
@@ -405,6 +405,27 @@ uint32_t OdriveCan::get32from8(uint8_t *data, int startIdx)
 {
     return data[startIdx] | data[startIdx + 1] << 8 | data[startIdx + 2] << 16 | data[startIdx + 3] << 24;
 }
+
+
+/*
+template <typename T>
+constexpr T can_getSignal(uint8_t * msg, const uint8_t startBit, const uint8_t length, const bool isIntel) {
+    uint64_t tempVal = 0;
+    uint64_t mask = length < 64 ? (1ULL << length) - 1ULL : -1ULL;
+
+    if (isIntel) {
+        std::memcpy(&tempVal, msg.buf, sizeof(tempVal));
+        tempVal = (tempVal >> startBit) & mask;
+    } else {
+        std::reverse(std::begin(msg.buf), std::end(msg.buf));
+        std::memcpy(&tempVal, msg.buf, sizeof(tempVal));
+        tempVal = (tempVal >> (64 - startBit - length)) & mask;
+    }
+
+    T retVal;
+    std::memcpy(&retVal, &tempVal, sizeof(T));
+    return retVal;
+}*/
 
 template <typename T>
 void OdriveCan::get_char_from_num(char *arr, T var)
@@ -577,7 +598,7 @@ int OdriveCan::call_set_controller_mode(int axisID, uint32_t control_mode, uint3
     // construct can message
     int msg_id = axisID << 5 | SET_CONTROLLER_MODE; // axis ID + can msg name
 #ifndef DEBUG
-    std::cout << "[SetEncoderMode] Ask to set encoder mode - CAN msg ID"
+    std::cout << "[SetControlerMode] Ask to set controller mode - CAN msg ID"
               << std::hex << msg_id << std::dec << std::endl;
 #endif
 
