@@ -356,15 +356,15 @@ void OdriveCan::parse_error(int axisID, canMsg msg)
 
 void OdriveCan::parse_encoder_estimates(int axisID, canMsg msg)
 {
-    uint32_t err = get32from8(msg.frame.data, 0);
-    uint32_t reason = get32from8(msg.frame.data, 4);
-    axes[axisID]->update_estimates(err, reason, msg.timestamp);
+    float pos = this->get_float(get32from8(msg.frame.data, 0));
+    float vel = this->get_float(get32from8(msg.frame.data, 4));
+    axes[axisID]->update_estimates(pos, vel, msg.timestamp);
 }
 
 void OdriveCan::parse_iq(int axisID, canMsg msg)
 {
-    uint32_t setpoint = get32from8(msg.frame.data, 0);
-    uint32_t measured = get32from8(msg.frame.data, 4);
+    float setpoint = this->get_float(get32from8(msg.frame.data, 0));
+    float measured = this->get_float(get32from8(msg.frame.data, 4));
     axes[axisID]->update_iq(setpoint, measured, msg.timestamp);
 }
 
@@ -373,25 +373,22 @@ void OdriveCan::parse_temp(int axisID, canMsg msg)
     // for (int i = 0; i < 8; i++)
     //     std::cout << unsigned(msg.frame.data[i]) << " ";
     // std::cout << std::endl;
-    uint32_t fet = get32from8(msg.frame.data, 0);
-    uint32_t motor = get32from8(msg.frame.data, 4);
+    float fet = this->get_float(get32from8(msg.frame.data, 0));
+    float motor = this->get_float(get32from8(msg.frame.data, 4));
     axes[axisID]->update_temp(fet, motor, msg.timestamp);
 }
 
 void OdriveCan::parse_ui(int axisID, canMsg msg)
 {
-     for (int i = 0; i < 8; i++)
-         std::cout << (unsigned)msg.frame.data[i] << " ";
-     std::cout << std::endl;
-    uint32_t voltage = get32from8(msg.frame.data, 0);
-    uint32_t current = get32from8(msg.frame.data, 4);
+    float voltage = this->get_float(get32from8(msg.frame.data, 0));
+    float current = this->get_float(get32from8(msg.frame.data, 4));
     axes[axisID]->update_ui(voltage, current, msg.timestamp);
 }
 
 void OdriveCan::parse_adc(int axisID, canMsg msg)
 {
 
-    uint32_t voltage = get32from8(msg.frame.data, 0);
+    float voltage = this->get_float(get32from8(msg.frame.data, 0));
     axes[axisID]->update_adc(voltage, msg.timestamp);
 }
 
@@ -403,8 +400,11 @@ void OdriveCan::parse_controller_error(int axisID, canMsg msg)
 
 uint32_t OdriveCan::get32from8(uint8_t *data, int startIdx)
 {
-    return data[startIdx] | data[startIdx + 1] << 8 | data[startIdx + 2] << 16 | data[startIdx + 3] << 24;
-}
+    if (lsb)
+        return data[startIdx] | data[startIdx + 1] << 8 | data[startIdx + 2] << 16 | data[startIdx + 3] << 24;
+    else
+        return data[startIdx + 3] | data[startIdx + 2] << 8 | data[startIdx + 1] << 16 | data[startIdx] << 24;
+} 
 
 
 /*
@@ -427,27 +427,56 @@ constexpr T can_getSignal(uint8_t * msg, const uint8_t startBit, const uint8_t l
     return retVal;
 }*/
 
+float OdriveCan::get_float(uint32_t f)
+{
+    static_assert(sizeof(float) == sizeof f, "`float` has a weird size.");
+    float ret;
+    std::memcpy(&ret, &f, sizeof(float));
+
+    return ret;
+}
+
 template <typename T>
-void OdriveCan::get_char_from_num(char *arr, T var)
+void OdriveCan::get_char_from_num(char *arr, T var, bool helper)
 {
     memcpy(arr, &var, sizeof(T));
+
+    if (!this->lsb)
+        std::reverse(arr, arr + sizeof(T));
+
 }
 
 template <typename T>
 void OdriveCan::get_char_from_nums(char *arr, T var1, T var2)
 {
-    this->get_char_from_num(arr, var1);
-    this->get_char_from_num(arr + sizeof(T), var2);
+    this->get_char_from_num<T>(arr, var1, true);
+    this->get_char_from_num<T>(arr + sizeof(T), var2, true);
 }
 
 template <typename T, typename F>
 void OdriveCan::get_char_from_nums(char *arr, T var1, F var2, F var3)
 {
-    this->get_char_from_num(arr, &var1);
-    char *ptr = arr + sizeof(T);
+    this->get_char_from_num<T>(arr, var1);
+    this->get_char_from_num<F>(arr + sizeof(T), var2);
+    this->get_char_from_num<F>(arr + sizeof(T) + sizeof(F), var3);
+
+   /* char *ptr = arr + sizeof(T);
     memcpy(ptr, &var2, sizeof(F));
     ptr += sizeof(F);
-    memcpy(ptr, &var3, sizeof(F));
+    memcpy(ptr, &var3, sizeof(F));*/
+}
+
+template <typename T>
+void OdriveCan::get_char_from_nums(char *arr, T var1, T var2, T var3)
+{
+    this->get_char_from_num<T>(arr, var1);
+    this->get_char_from_num<T>(arr + sizeof(T), var2);
+    this->get_char_from_num<T>(arr + 2*sizeof(T), var3);
+
+   /* char *ptr = arr + sizeof(T);
+    memcpy(ptr, &var2, sizeof(F));
+    ptr += sizeof(F);
+    memcpy(ptr, &var3, sizeof(F));*/
 }
 
 std::ostream &operator<<(std::ostream &out, OdriveCan const *oc)
@@ -621,7 +650,7 @@ int OdriveCan::call_set_controller_mode(int axisID, uint32_t control_mode, uint3
     return 0;
 };
 
-int OdriveCan::call_set_input_pos(int axisID, uint32_t input_pos, float vel_ff, float torque_ff)
+int OdriveCan::call_set_input_pos(int axisID, float input_pos, float vel_ff, float torque_ff)
 {
     int msg_id = axisID << 5 | SET_INPUT_POS; // axis ID + can msg name
 #ifdef DEBUG
@@ -630,7 +659,7 @@ int OdriveCan::call_set_input_pos(int axisID, uint32_t input_pos, float vel_ff, 
 #endif
 
     char data[8];
-    this->get_char_from_nums<uint32_t, float>(data, input_pos, vel_ff, torque_ff);
+    this->get_char_from_nums< float>(data, input_pos, vel_ff, torque_ff);
     send_mutex.lock();
     int ret = can_dev->send(msg_id, canMsgLen[SET_INPUT_POS], data);
     send_mutex.unlock();
@@ -647,7 +676,7 @@ int OdriveCan::call_set_input_pos(int axisID, uint32_t input_pos, float vel_ff, 
     return 0;
 };
 
-int OdriveCan::call_set_input_vel(int axisID, uint32_t input_vel, uint32_t input_torque_ff)
+int OdriveCan::call_set_input_vel(int axisID, float input_vel, float input_torque_ff)
 {
     int msg_id = axisID << 5 | SET_INPUT_VEL; // axis ID + can msg name
 #ifdef DEBUG
@@ -656,7 +685,7 @@ int OdriveCan::call_set_input_vel(int axisID, uint32_t input_vel, uint32_t input
 #endif
 
     char data[8];
-    this->get_char_from_nums<uint32_t>(data, input_vel, input_torque_ff);
+    this->get_char_from_nums<float>(data, input_vel, input_torque_ff);
     send_mutex.lock();
     int ret = can_dev->send(msg_id, canMsgLen[SET_INPUT_VEL], data);
     send_mutex.unlock();
@@ -672,7 +701,7 @@ int OdriveCan::call_set_input_vel(int axisID, uint32_t input_vel, uint32_t input
     return 0;
 }
 
-int OdriveCan::call_set_input_torque(int axisID, uint32_t torque)
+int OdriveCan::call_set_input_torque(int axisID, float torque)
 {
 
     int msg_id = axisID << 5 | SET_INPUT_TORQUE; // axis ID + can msg name
@@ -682,7 +711,7 @@ int OdriveCan::call_set_input_torque(int axisID, uint32_t torque)
 #endif
 
     char data[4];
-    this->get_char_from_num<uint32_t>(data, torque);
+    this->get_char_from_num<float>(data, torque);
     send_mutex.lock();
     int ret = can_dev->send(msg_id, canMsgLen[SET_INPUT_TORQUE], data);
     send_mutex.unlock();
@@ -700,7 +729,7 @@ int OdriveCan::call_set_input_torque(int axisID, uint32_t torque)
     return 0;
 };
 
-int OdriveCan::call_set_limits(int axisID, uint32_t velocity, uint32_t current)
+int OdriveCan::call_set_limits(int axisID, float velocity, float current)
 {
     int msg_id = axisID << 5 | SET_LIMITS; // axis ID + can msg name
 #ifdef DEBUG
@@ -709,7 +738,7 @@ int OdriveCan::call_set_limits(int axisID, uint32_t velocity, uint32_t current)
 #endif
 
     char data[8];
-    this->get_char_from_nums<uint32_t>(data, velocity, current);
+    this->get_char_from_nums<float>(data, velocity, current);
     send_mutex.lock();
     int ret = can_dev->send(msg_id, canMsgLen[SET_LIMITS], data);
     send_mutex.unlock();
@@ -751,7 +780,7 @@ int OdriveCan::call_start_anticogging(int axisID)
     return 0;
 };
 
-int OdriveCan::call_set_traj_vel_limit(int axisID, uint32_t lim)
+int OdriveCan::call_set_traj_vel_limit(int axisID, float lim)
 {
     int msg_id = axisID << 5 | SET_TRAJ_VEL_LIMIT; // axis ID + can msg name
 #ifdef DEBUG
@@ -760,7 +789,7 @@ int OdriveCan::call_set_traj_vel_limit(int axisID, uint32_t lim)
 #endif
 
     char data[4];
-    this->get_char_from_num<uint32_t>(data, lim);
+    this->get_char_from_num<float>(data, lim);
     send_mutex.lock();
     int ret = can_dev->send(msg_id, canMsgLen[SET_TRAJ_VEL_LIMIT], data);
     send_mutex.unlock();
@@ -778,7 +807,7 @@ int OdriveCan::call_set_traj_vel_limit(int axisID, uint32_t lim)
     return 0;
 };
 
-int OdriveCan::call_set_traj_accel_limits(int axisID, uint32_t accel, uint32_t decel)
+int OdriveCan::call_set_traj_accel_limits(int axisID, float accel, float decel)
 {
     int msg_id = axisID << 5 | SET_TRAJ_ACCEL_LIMITS; // axis ID + can msg name
 #ifdef DEBUG
@@ -787,7 +816,7 @@ int OdriveCan::call_set_traj_accel_limits(int axisID, uint32_t accel, uint32_t d
 #endif
 
     char data[8];
-    this->get_char_from_nums<uint32_t>(data, accel, decel);
+    this->get_char_from_nums<float>(data, accel, decel);
     send_mutex.lock();
     int ret = can_dev->send(msg_id, canMsgLen[SET_TRAJ_ACCEL_LIMITS], data);
     send_mutex.unlock();
@@ -805,7 +834,7 @@ int OdriveCan::call_set_traj_accel_limits(int axisID, uint32_t accel, uint32_t d
     return 0;
 };
 
-int OdriveCan::call_set_traj_inertia(int axisID, uint32_t inertia)
+int OdriveCan::call_set_traj_inertia(int axisID, float inertia)
 {
 
     int msg_id = axisID << 5 | SET_TRAJ_INERTIA; // axis ID + can msg name
@@ -815,7 +844,7 @@ int OdriveCan::call_set_traj_inertia(int axisID, uint32_t inertia)
 #endif
 
     char data[4];
-    this->get_char_from_num<uint32_t>(data, inertia);
+    this->get_char_from_num<float>(data, inertia);
     send_mutex.lock();
     int ret = can_dev->send(msg_id, canMsgLen[SET_TRAJ_INERTIA], data);
     send_mutex.unlock();
@@ -937,7 +966,7 @@ int OdriveCan::call_clear_errors(int axisID)
     return 0;
 };
 
-int OdriveCan::call_set_absolute_position(int axisID, uint32_t pos)
+int OdriveCan::call_set_absolute_position(int axisID, float pos)
 {
     int msg_id = axisID << 5 | SET_ABSOLUTE_POSITION; // axis ID + can msg name
 #ifdef DEBUG
@@ -946,7 +975,7 @@ int OdriveCan::call_set_absolute_position(int axisID, uint32_t pos)
 #endif
 
     char data[4];
-    this->get_char_from_num<uint32_t>(data, pos);
+    this->get_char_from_num<float>(data, pos);
     send_mutex.lock();
     int ret = can_dev->send(msg_id, canMsgLen[SET_ABSOLUTE_POSITION], data);
     send_mutex.unlock();
@@ -961,7 +990,7 @@ int OdriveCan::call_set_absolute_position(int axisID, uint32_t pos)
     return 0;
 };
 
-int OdriveCan::call_set_pos_gain(int axisID, uint32_t gain)
+int OdriveCan::call_set_pos_gain(int axisID, float gain)
 {
     int msg_id = axisID << 5 | SET_POS_GAIN; // axis ID + can msg name
 #ifdef DEBUG
@@ -970,7 +999,7 @@ int OdriveCan::call_set_pos_gain(int axisID, uint32_t gain)
 #endif
 
     char data[4];
-    this->get_char_from_num<uint32_t>(data, gain);
+    this->get_char_from_num<float>(data, gain);
     send_mutex.lock();
     int ret = can_dev->send(msg_id, canMsgLen[SET_POS_GAIN], data);
     send_mutex.unlock();
@@ -986,7 +1015,7 @@ int OdriveCan::call_set_pos_gain(int axisID, uint32_t gain)
     return 0;
 };
 
-int OdriveCan::call_set_vel_gains(int axisID, uint32_t gain, uint32_t integrator)
+int OdriveCan::call_set_vel_gains(int axisID, float gain, float integrator)
 {
     int msg_id = axisID << 5 | SET_VEL_GAINS; // axis ID + can msg name
 #ifdef DEBUG
@@ -996,7 +1025,7 @@ int OdriveCan::call_set_vel_gains(int axisID, uint32_t gain, uint32_t integrator
 #endif
 
     char data[8];
-    this->get_char_from_nums<uint32_t>(data, gain, integrator);
+    this->get_char_from_nums<float>(data, gain, integrator);
     send_mutex.lock();
     int ret = can_dev->send(msg_id, canMsgLen[SET_VEL_GAINS], data);
     send_mutex.unlock();

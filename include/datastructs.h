@@ -59,21 +59,21 @@ typedef struct
     uint32_t current_limit;
     struct timeval  anticogging_timestamp;
     // set_input_pos
-    uint32_t input_pos;
+    float input_pos;
     float vel_ff;
     float torque_ff;
     // set_input_vel
-    uint32_t input_vel;
-    uint32_t input_torque_ff;
+    float input_vel;
+    float input_torque_ff;
     // set_input_torque
-    uint32_t input_torque;
+    float input_torque;
     // set_traj_vel_limit
-    uint32_t traj_vel_limit;
+    float traj_vel_limit;
     // set_traj_accel_limits
-    uint32_t traj_accel_limit;
-    uint32_t traj_decel_limit;
+    float traj_accel_limit;
+    float traj_decel_limit;
     // set_traj_inertia
-    uint32_t traj_inertia;
+    float traj_inertia;
 
     struct timeval timestamp;
 
@@ -85,10 +85,10 @@ typedef struct
 typedef struct
 {
     // set_pos_gain
-    uint32_t pos_gain;
+    float pos_gain;
     // set_vel_gains
-    uint32_t vel_gain;
-    uint32_t vel_integrator_gain;
+    float vel_gain;
+    float vel_integrator_gain;
 } gains;
 
 /**
@@ -97,8 +97,8 @@ typedef struct
 typedef struct
 {
     // get_temperature
-    uint32_t fet_temperature;
-    uint32_t motor_temperature;
+    float fet_temperature;
+    float motor_temperature;
     struct timeval timestamp;
 } tempStruct;
 
@@ -108,8 +108,8 @@ typedef struct
 typedef struct
 {
     // Get_Encoder_Estimates
-    uint32_t pos_estimate;
-    uint32_t vel_estimate;
+    float pos_estimate;
+    float vel_estimate;
     struct timeval timestamp;
 } encoderStruct;
 
@@ -119,8 +119,8 @@ typedef struct
 typedef struct
 {
     // get_iq
-    uint32_t iq_setpoint;
-    uint32_t iq_measured;
+    float iq_setpoint;
+    float iq_measured;
     struct timeval timestamp;
 } iqStruct;
 
@@ -130,8 +130,8 @@ typedef struct
 typedef struct
 {
     // Get_Bus_Voltage_Current
-    uint32_t bus_voltage;
-    uint32_t bus_current;
+    float bus_voltage;
+    float bus_current;
     struct timeval timestamp;
 } busUI;
 
@@ -153,6 +153,6 @@ typedef struct
 typedef struct
 {
     // ADC voltage
-    uint32_t adc_voltage;
+    float adc_voltage;
     struct timeval timestamp;
 } adcVoltage;

@@ -89,6 +89,8 @@ private:
 
     std::string dev_name;  // conencted device's system name
 
+    bool lsb; // defines is architecture is Least Significant Bit
+
     enum
     {
         GET_VERSION = 0x000,
@@ -124,13 +126,13 @@ private:
 
 public:
 
-    OdriveCan() : axes_num(6), buffer_len(10), run(1), update_period_us(100000), err_update_period_us(10000)
+    OdriveCan() : axes_num(6), buffer_len(10), run(1), update_period_us(100000), err_update_period_us(10000), lsb(true)
     {
         std::cout << "[OdriveCAN] Init Ordive can constructor" << std::endl;
         this->init();
     };
 
-    OdriveCan(int axes_num) :  axes_num(axes_num), buffer_len(10), run(1), update_period_us(100000),  err_update_period_us(10000)
+    OdriveCan(int axes_num) :  axes_num(axes_num), buffer_len(10), run(1), update_period_us(100000),  err_update_period_us(10000), lsb(true)
     {
         this->init();
     };
@@ -217,13 +219,18 @@ public:
    // void get_char_from_uint(char* arr, uint32_t var);
 
     template <typename T> 
-    void get_char_from_num(char *arr, T var);
+    void get_char_from_num(char *arr, T var, bool helper=false);
 
     template <typename T> 
     void get_char_from_nums(char *arr, T var1, T var2);
 
     template <typename T, typename F>
     void get_char_from_nums(char *arr, T var1, F var2, F var3);
+
+    template <typename T> 
+    void get_char_from_nums(char *arr, T var1, T var2, T var3);
+
+    float get_float(uint32_t f);
 
     // USER called functions ---------------------------------------------------------
     /**
@@ -246,21 +253,21 @@ public:
 
     int call_set_controller_mode(int axisID, uint32_t control_mode, uint32_t input_mode);
 
-    int call_set_input_pos(int axisID, uint32_t input_pos, float vel_ff, float torque_ff) ;
+    int call_set_input_pos(int axisID, float input_pos, float vel_ff, float torque_ff) ;
 
-    int call_set_input_vel(int axisID, uint32_t input_vel, uint32_t input_torque_ff);
+    int call_set_input_vel(int axisID, float input_vel, float input_torque_ff);
 
-    int call_set_input_torque(int axisID, uint32_t torque) ;
+    int call_set_input_torque(int axisID, float torque) ;
 
-    int call_set_limits(int axisID, uint32_t velocity, uint32_t current);
+    int call_set_limits(int axisID, float velocity, float current);
 
     int call_start_anticogging(int axisID); 
 
-    int call_set_traj_vel_limit(int axisID,  uint32_t lim);
+    int call_set_traj_vel_limit(int axisID,  float lim);
 
-    int call_set_traj_accel_limits(int axisID, uint32_t accel, uint32_t decel);
+    int call_set_traj_accel_limits(int axisID, float accel, float decel);
 
-    int call_set_traj_inertia(int axisID, uint32_t inertia);
+    int call_set_traj_inertia(int axisID, float inertia);
 
     int call_get_iq(int axisID);
 
@@ -272,11 +279,11 @@ public:
 
     int call_clear_errors(int axisID);
 
-    int call_set_absolute_position(int axisID, uint32_t pos);
+    int call_set_absolute_position(int axisID, float pos);
 
-    int call_set_pos_gain(int axisID, uint32_t gain);
+    int call_set_pos_gain(int axisID, float gain);
 
-    int call_set_vel_gains(int axisID, uint32_t gain, uint32_t integrator);
+    int call_set_vel_gains(int axisID, float gain, float integrator);
 
     int call_get_adc_voltage(int axisID);
 

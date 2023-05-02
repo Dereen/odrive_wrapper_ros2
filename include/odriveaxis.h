@@ -41,7 +41,7 @@ private:
     uint32_t axis_requested_state;
 
     // set_absolute_position
-    uint32_t position;
+    float position;
 
     // reboot
     struct timeval reboot_timestamp;
@@ -122,7 +122,7 @@ public:
      * @param[in] vel vel_estimate
      * @param[in] timestamp
      */
-    void update_estimates(uint32_t pos, uint32_t vel, struct timeval timestamp);
+    void update_estimates(float pos, float vel, struct timeval timestamp);
 
     /**
      * @brief Set the iq estimates upon recieving get_iq response.
@@ -131,7 +131,7 @@ public:
      * @param[in] measured iq_measured
      * @param[in] timestamp
      */
-    void update_iq(uint32_t setpoint, uint32_t measured, struct timeval timestamp);
+    void update_iq(float setpoint, float measured, struct timeval timestamp);
 
     /**
      * @brief Updates the stored temperature readings upon recieving get_temperature response.
@@ -140,7 +140,7 @@ public:
      * @param[in] motor motor_temperature
      * @param[in] timestamp
      */
-    void update_temp(uint32_t fet, uint32_t motor, struct timeval timestamp);
+    void update_temp(float fet, float motor, struct timeval timestamp);
 
     /**
      * @brief updates stored bus's voltage and current apon recieving response to get_bus_voltage_current.
@@ -149,7 +149,7 @@ public:
      * @param[in] current bus_current
      * @param[in] timestamp
      */
-    void update_ui(uint32_t voltage, uint32_t current, struct timeval timestamp);
+    void update_ui(float voltage, float current, struct timeval timestamp);
 
     /**
      * @brief updates stored ADC value after recieving get_adc_voltage reponse.
@@ -157,7 +157,7 @@ public:
      * @param[in] voltage ADC_voltage
      * @param[in] timestamp
      */
-    void update_adc(uint32_t voltage, struct timeval timestamp);
+    void update_adc(float voltage, struct timeval timestamp);
 
     /**
      * @brief updates stored controller error upn recieving get_controller_error response
@@ -179,25 +179,25 @@ public:
 
     uint32_t get_input_mode();
 
-    void update_input_pos(uint32_t input_pos, float vel_ff, float torque_ff);
+    void update_input_pos(float input_pos, float vel_ff, float torque_ff);
 
-    void update_input_vel(uint32_t input_vel, uint32_t input_torque_ff);
+    void update_input_vel(float input_vel, float input_torque_ff);
 
-    void update_input_torque(uint32_t input_torque);
+    void update_input_torque(float input_torque);
 
-    void update_limits(uint32_t velocity, uint32_t current);
+    void update_limits(float velocity, float current);
 
-    void update_traj_vel_limit(uint32_t lim);
+    void update_traj_vel_limit(float lim);
 
-    void update_traj_accel_limit(uint32_t accel, uint32_t decel);
+    void update_traj_accel_limit(float accel, float decel);
 
-    void update_traj_inertia(uint32_t inertia);
+    void update_traj_inertia(float inertia);
 
-    void update_absolut_pos(uint32_t pos);
+    void update_absolut_pos(float pos);
 
-    void update_pos_gain(uint32_t gain);
+    void update_pos_gain(float gain);
 
-    void update_vel_gains(uint32_t gain, uint32_t integrator_gain);
+    void update_vel_gains(float gain, float integrator_gain);
 
     void update_anticogging(struct timeval b);
 

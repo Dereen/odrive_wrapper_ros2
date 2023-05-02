@@ -19,16 +19,17 @@
 int main(int argc, char **argv)
 {
 	printf("create can device\n");
-	OdriveCan * odrive = new OdriveCan(1);
+	OdriveCan * odrive = new OdriveCan(2);
 
 	printf("Ask to get version\n");
 	odrive->call_get_version(0);
-	odrive->call_get_bus_ui(0);
-	odrive->call_get_adc_voltage(0);
+	odrive->call_set_axis_state(0, AXIS_STATE_CLOSED_LOOP_CONTROL);
 	//odrive->call_start_anticogging(1);
-	odrive->call_set_controller_mode(0, 1, 1);
+	// odrive->call_set_controller_mode(0, 1, 1);
 	sleep(1);
-	odrive->call_reboot(0);
+	//odrive->call_set_input_vel(0, 0xADDDDD41, 0);
+	//odrive->call_set_input_vel(0, 10, 0);
+	// odrive->call_reboot(0);
 
 	// print axis stats
 	for (auto i =0 ; i< 2; i++){
@@ -36,10 +37,13 @@ int main(int argc, char **argv)
 
 		sleep(1);
 		odrive->call_get_tempterature(0);
-	//	odrive->call_set_absolute_position(1, 123);
+		odrive->call_set_absolute_position(0, 123);
 	}
+		odrive->call_set_input_vel(0, 0, 0);
 
 	std::cout << odrive << std::endl;
+
+	odrive->call_set_axis_state(0, AXIS_STATE_IDLE);
 
 	return 0;
 }

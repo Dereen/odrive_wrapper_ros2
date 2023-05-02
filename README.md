@@ -2,6 +2,10 @@
 napajeni  24 V  
 nastaven bitrate 500 000  
 
+## Spusteni odrive
+1. nastavit axis state na closed loop control (odrv0.axis0.requested_state = AxisState.CLOSED_LOOP_CONTROL)
+2. spusteni v velocity regulation mode pres controller_input_vel = 10 (odrv0.axis0.controller.input_vel = 10)
+
 ## Aktivace CAN interface
 Pred spustenim kodu musi se nakonfigurovat port pro prijimac.   
 
@@ -36,6 +40,7 @@ Dá se ověřit, že nstavení proběhlo správně přes ```candump canX```, kde
 - pri jakekoli chybe nepouzije standardni Can protokol, kdy se do CAN ID prida flag, ale odesla zpravu vyplenou nulami, coz odpovida Axis0_Get_version
 - Get_Bus_Voltage_Current odpovida pouze na voltage
     - i kdyz ze seznamu se hodnota tvari jako unit32, jedna se o float
+- Na stránkách je odkaz na DBC kód, který ale ovšem není aktuální. Tento dirver je naprogramován pro verzi 0.6.6 zdokumentovanou na strankach Odrive Pro Documentation
 
 ## Specifikace C++ interface pro ODrive
 Dokumentace pro ODrive, kde lze dohledat všechny následující parametry zmíněné v tomto dokumentu
