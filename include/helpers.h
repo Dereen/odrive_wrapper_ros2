@@ -31,7 +31,7 @@ bool key_present(std::unordered_map<int, int> m, int key)
 
 uint32_t get32from8(uint8_t *data, int startIdx, bool lsb=true)
 {
-    if (lsb)
+    if (!lsb)
         return data[startIdx] | data[startIdx + 1] << 8 | data[startIdx + 2] << 16 | data[startIdx + 3] << 24;
     else
         return data[startIdx + 3] | data[startIdx + 2] << 8 | data[startIdx + 1] << 16 | data[startIdx] << 24;

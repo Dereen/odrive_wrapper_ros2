@@ -40,7 +40,7 @@ int CanDevice::send(uint16_t id, uint16_t dlc, char * data, bool rtr)
 		return -1;
 	}
 
-	#ifdef DEBUG
+	#ifndef DEBUG
 	printf("-> 0x%03X [%d] ", f.can_id, f.can_dlc);
 
 	for (int i = 0; i < f.can_dlc; i++)
@@ -72,7 +72,7 @@ int CanDevice::send(uint16_t id, uint16_t dlc, bool rtr)
 		return -1;
 	}
 
-	#ifdef DEBUG
+	#ifndef DEBUG
 	printf("-> 0x%03X [%d] ", f.can_id, f.can_dlc);
 
 	for (int i = 0; i < f.can_dlc; i++)

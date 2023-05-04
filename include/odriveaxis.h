@@ -173,6 +173,8 @@ public:
 
     int get_axis_id();
 
+    void set_axis_id(int id);
+
     void update_controller_mode(uint32_t control_mode, uint32_t input_mode);
 
     uint32_t get_controll_mode();
