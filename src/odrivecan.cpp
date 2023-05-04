@@ -24,6 +24,7 @@
 #include <sys/time.h>
 
 #include "odrivecan.h"
+#include "helpers.h"
 
 int OdriveCan::get_axes_num()
 {
@@ -81,8 +82,8 @@ void OdriveCan::init()
     std::cout << "[OdriveCan] start threads" << std::endl;
     th_recieve = std::thread(&OdriveCan::receive_msgs, this);
     th_process = std::thread(&OdriveCan::process_msgs, this);
-    // th_send = std::thread(&OdriveCan::ask_for_current_values, this);
-    // th_errors = std::thread(&OdriveCan::get_errors, this);
+    th_send = std::thread(&OdriveCan::ask_for_current_values, this);
+    th_errors = std::thread(&OdriveCan::get_errors, this);
 }
 
 void OdriveCan::set_periods(int32_t status_time, int32_t data_time)
@@ -126,10 +127,6 @@ int OdriveCan::axis_from_header(uint32_t header)
     return id >> 5;
 }
 
-bool OdriveCan::check_msg_error(uint32_t header)
-{
-    return CAN_ERR_FLAG & header;
-}
 
 /**
  * @brief Sends CAN requests for temperature readings, encoder estimates, motor current, and ADC voltage
@@ -157,7 +154,7 @@ void OdriveCan::ask_for_current_values()
             //  std::cout << "ask for adc voltage" << std::endl;
             call_get_adc_voltage(id);
         }
-        usleep(periods->data);
+        usleep(periods->data*1000);
     }
 }
 
@@ -174,18 +171,10 @@ void OdriveCan::get_errors()
             id = it->get_axis_id();
             call_get_error(id);
             call_get_controller_error(id);
+            
         }
-        usleep(periods->axis_status);
+        usleep(periods->axis_status*1000);
     }
-}
-
-bool OdriveCan::check_key(std::unordered_map<int, int> m, int key)
-{
-    // Key is not present
-    if (m.count(key) == 0)
-        return false;
-
-    return true;
 }
 
 void OdriveCan::receive_msgs()
@@ -206,16 +195,16 @@ void OdriveCan::receive_msgs()
 
         //  store message with timestamp
         msg = {frame, timestamp};
-        if (!check_key(axes_ids, ax_id)) // key is not present in unordered map
+        if (!key_present(axes_ids, ax_id)) // key is not present in unordered map
         {
             std::cout << "[ERROR] recieved message from unexpected axis ID " << get_axis_id() << std::endl;
             continue;
         }
         else
         {
-            msg_mutex.lock();
+            buffer_mutex.lock();
             input_buffer[axes_ids[ax_id]]->push_back(msg);
-            msg_mutex.unlock();
+            buffer_mutex.unlock();
         }
 
         if (input_buffer[axes_ids[ax_id]]->full())
@@ -236,10 +225,10 @@ void OdriveCan::process_msgs()
 
             if (!input_buffer[it.second]->empty())
             { // if buffer for given axis is not empty
-                msg_mutex.lock();
+                buffer_mutex.lock();
                 msg = input_buffer[it.second]->front();
                 input_buffer[it.second]->pop_front();
-                msg_mutex.unlock();
+                buffer_mutex.unlock();
 
                 int canID = can_id_from_header(msg.frame.can_id);
                 if (check_msg_error(msg.frame.can_id))
@@ -276,6 +265,7 @@ void OdriveCan::process_msgs()
                     parse_adc(it.first, msg);
                     break;
                 case GET_CONTROLLER_ERROR:
+                std::cout << "got response to controller error" << std::endl;
                     parse_controller_error(it.first, msg);
                     break;
 
@@ -342,7 +332,6 @@ void OdriveCan::process_msgs()
 
 void OdriveCan::parse_version(int axisID, canMsg msg)
 {
-    std::cout << "got version response\n";
     uint8_t hw_maj = uint8_t(msg.frame.data[1]);
     uint8_t hw_min = uint8_t(msg.frame.data[2]);
     uint8_t hw_var = uint8_t(msg.frame.data[3]);
@@ -355,28 +344,28 @@ void OdriveCan::parse_version(int axisID, canMsg msg)
 
 void OdriveCan::parse_heartbeat(int axisID, canMsg msg)
 {
-    uint32_t err = get32from8(msg.frame.data, 0);
+    uint32_t err = get32from8(msg.frame.data, 0, lsb);
     axes[axisID]->set_axis_state(err, msg.frame.data[4], msg.frame.data[5], msg.frame.data[6], msg.timestamp);
 }
 
 void OdriveCan::parse_error(int axisID, canMsg msg)
 {
-    uint32_t err = get32from8(msg.frame.data, 0);
-    uint32_t reason = get32from8(msg.frame.data, 4);
+    uint32_t err = get32from8(msg.frame.data, 0, lsb);
+    uint32_t reason = get32from8(msg.frame.data, 4, lsb);
     axes[axisID]->update_error(err, reason, msg.timestamp);
 }
 
 void OdriveCan::parse_encoder_estimates(int axisID, canMsg msg)
 {
-    float pos = this->get_float(get32from8(msg.frame.data, 0));
-    float vel = this->get_float(get32from8(msg.frame.data, 4));
+    float pos = get_float(get32from8(msg.frame.data, 0, lsb));
+    float vel = get_float(get32from8(msg.frame.data, 4, lsb));
     axes[axisID]->update_estimates(pos, vel, msg.timestamp);
 }
 
 void OdriveCan::parse_iq(int axisID, canMsg msg)
 {
-    float setpoint = this->get_float(get32from8(msg.frame.data, 0));
-    float measured = this->get_float(get32from8(msg.frame.data, 4));
+    float setpoint = get_float(get32from8(msg.frame.data, 0, lsb));
+    float measured = get_float(get32from8(msg.frame.data, 4, lsb));
     axes[axisID]->update_iq(setpoint, measured, msg.timestamp);
 }
 
@@ -385,109 +374,31 @@ void OdriveCan::parse_temp(int axisID, canMsg msg)
     // for (int i = 0; i < 8; i++)
     //     std::cout << unsigned(msg.frame.data[i]) << " ";
     // std::cout << std::endl;
-    float fet = this->get_float(get32from8(msg.frame.data, 0));
-    float motor = this->get_float(get32from8(msg.frame.data, 4));
+    float fet = get_float(get32from8(msg.frame.data, 0, lsb));
+    float motor = get_float(get32from8(msg.frame.data, 4, lsb));
     axes[axisID]->update_temp(fet, motor, msg.timestamp);
 }
 
 void OdriveCan::parse_ui(int axisID, canMsg msg)
 {
-    float voltage = this->get_float(get32from8(msg.frame.data, 0));
-    float current = this->get_float(get32from8(msg.frame.data, 4));
+    float voltage = get_float(get32from8(msg.frame.data, 0, lsb));
+    float current = get_float(get32from8(msg.frame.data, 4, lsb));
     axes[axisID]->update_ui(voltage, current, msg.timestamp);
 }
 
 void OdriveCan::parse_adc(int axisID, canMsg msg)
 {
 
-    float voltage = this->get_float(get32from8(msg.frame.data, 0));
+    float voltage = get_float(get32from8(msg.frame.data, 0, lsb));
     axes[axisID]->update_adc(voltage, msg.timestamp);
 }
 
 void OdriveCan::parse_controller_error(int axisID, canMsg msg)
 {
-    uint32_t err = get32from8(msg.frame.data, 0);
+    uint32_t err = get32from8(msg.frame.data, 0, lsb);
     axes[axisID]->update_controller_err(err, msg.timestamp);
 }
 
-uint32_t OdriveCan::get32from8(uint8_t *data, int startIdx)
-{
-    if (lsb)
-        return data[startIdx] | data[startIdx + 1] << 8 | data[startIdx + 2] << 16 | data[startIdx + 3] << 24;
-    else
-        return data[startIdx + 3] | data[startIdx + 2] << 8 | data[startIdx + 1] << 16 | data[startIdx] << 24;
-}
-
-/*
-template <typename T>
-constexpr T can_getSignal(uint8_t * msg, const uint8_t startBit, const uint8_t length, const bool isIntel) {
-    uint64_t tempVal = 0;
-    uint64_t mask = length < 64 ? (1ULL << length) - 1ULL : -1ULL;
-
-    if (isIntel) {
-        std::memcpy(&tempVal, msg.buf, sizeof(tempVal));
-        tempVal = (tempVal >> startBit) & mask;
-    } else {
-        std::reverse(std::begin(msg.buf), std::end(msg.buf));
-        std::memcpy(&tempVal, msg.buf, sizeof(tempVal));
-        tempVal = (tempVal >> (64 - startBit - length)) & mask;
-    }
-
-    T retVal;
-    std::memcpy(&retVal, &tempVal, sizeof(T));
-    return retVal;
-}*/
-
-float OdriveCan::get_float(uint32_t f)
-{
-    static_assert(sizeof(float) == sizeof f, "`float` has a weird size.");
-    float ret;
-    std::memcpy(&ret, &f, sizeof(float));
-
-    return ret;
-}
-
-template <typename T>
-void OdriveCan::get_char_from_num(char *arr, T var, bool helper)
-{
-    memcpy(arr, &var, sizeof(T));
-
-    if (!this->lsb)
-        std::reverse(arr, arr + sizeof(T));
-}
-
-template <typename T>
-void OdriveCan::get_char_from_nums(char *arr, T var1, T var2)
-{
-    this->get_char_from_num<T>(arr, var1, true);
-    this->get_char_from_num<T>(arr + sizeof(T), var2, true);
-}
-
-template <typename T, typename F>
-void OdriveCan::get_char_from_nums(char *arr, T var1, F var2, F var3)
-{
-    this->get_char_from_num<T>(arr, var1);
-    this->get_char_from_num<F>(arr + sizeof(T), var2);
-    this->get_char_from_num<F>(arr + sizeof(T) + sizeof(F), var3);
-
-    /* char *ptr = arr + sizeof(T);
-     memcpy(ptr, &var2, sizeof(F));
-     ptr += sizeof(F);
-     memcpy(ptr, &var3, sizeof(F));*/
-}
-
-template <typename T>
-void OdriveCan::get_char_from_nums(char *arr, T var1, T var2, T var3)
-{
-    this->get_char_from_num<T>(arr, var1);
-    this->get_char_from_num<T>(arr + sizeof(T), var2);
-    this->get_char_from_num<T>(arr + 2 * sizeof(T), var3);
-
-    /* char *ptr = arr + sizeof(T);
-     memcpy(ptr, &var2, sizeof(F));
-     ptr += sizeof(F);
-     memcpy(ptr, &var3, sizeof(F));*/
-}
 
 std::ostream &operator<<(std::ostream &out, OdriveCan const *oc)
 {
@@ -500,13 +411,6 @@ std::ostream &operator<<(std::ostream &out, OdriveCan const *oc)
     return out;
 }
 
-bool key_present(std::unordered_map<int, int> m, int key)
-{
-    if (m.count(key) == 0)
-        return 0;
-
-    return 1;
-}
 
 int OdriveCan::call_get_version(int axisID)
 {
@@ -521,7 +425,7 @@ int OdriveCan::call_get_version(int axisID)
         send_mutex.unlock();
         if (ret < 0)
         {
-            std::cout << "[ERROR]  on axis" << axisID << " - GET_VERSION. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR]  on axis" << axisID << " - GET_VERSION. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         }
 
@@ -545,7 +449,7 @@ int OdriveCan::call_estop(int axisID)
         send_mutex.unlock();
         if (ret < 0)
         {
-            std::cout << "[ERROR]  on axis" << axisID << " - ESTOP. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << axisID << " - ESTOP. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         }
 
@@ -572,7 +476,7 @@ int OdriveCan::call_get_error(int axisID)
         send_mutex.unlock();
         if (ret < 0)
         {
-            std::cout << "[ERROR]  on axis" << axisID << " - GET_ERROR. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << axisID << " - GET_ERROR. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         }
 
@@ -593,13 +497,13 @@ int OdriveCan::call_set_axis_node_id(int oldID, uint32_t newID)
 #endif
 
         char data[4];
-        this->get_char_from_num<uint32_t>(data, newID);
+        get_char_from_num<uint32_t>(data, newID, lsb);
         send_mutex.lock();
         int ret = can_dev->send(msg_id, canMsgLen[SET_AXIS_NODE_ID], data);
         send_mutex.unlock();
         if (ret < 0)
         {
-            std::cout << "[ERROR]  on axis" << oldID << " - SET_AXIS_NODE_ID. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << oldID << " - SET_AXIS_NODE_ID. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         }
 
@@ -629,13 +533,13 @@ int OdriveCan::call_set_axis_state(int axisID, uint32_t req_state)
 #endif
 
         char data[4];
-        this->get_char_from_num<uint32_t>(data, req_state);
+        get_char_from_num<uint32_t>(data, req_state, lsb);
         send_mutex.lock();
         int ret = can_dev->send(msg_id, canMsgLen[SET_AXIS_STATE], data);
         send_mutex.unlock();
         if (ret < 0)
         {
-            std::cout << "[ERROR]  on axis" << axisID << " - SET_AXIS_STATE. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << axisID << " - SET_AXIS_STATE. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         }
 
@@ -660,7 +564,7 @@ int OdriveCan::call_get_encoder_estimates(int axisID)
         send_mutex.unlock();
         if (ret < 0)
         {
-            std::cout << "[ERROR]  on axis" << axisID << " - GET_ENCODER_ESTIMATES. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << axisID << " - GET_ENCODER_ESTIMATES. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         }
 
@@ -682,13 +586,13 @@ int OdriveCan::call_set_controller_mode(int axisID, uint32_t control_mode, uint3
 #endif
 
         char data[8];
-        this->get_char_from_nums<uint32_t>(data, control_mode, input_mode);
+        get_char_from_nums<uint32_t>(data, control_mode, input_mode, lsb);
         send_mutex.lock();
         int ret = can_dev->send(msg_id, canMsgLen[SET_CONTROLLER_MODE], data);
         send_mutex.unlock();
         if (ret < 0)
         {
-            std::cout << "[ERROR]  on axis" << axisID << " - SET_CONTROLLER_MODE. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << axisID << " - SET_CONTROLLER_MODE. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         }
 
@@ -714,13 +618,13 @@ int OdriveCan::call_set_input_pos(int axisID, float input_pos, float vel_ff, flo
 #endif
 
         char data[8];
-        this->get_char_from_nums<float>(data, input_pos, vel_ff, torque_ff);
+        get_char_from_nums<float>(data, input_pos, vel_ff, torque_ff, lsb);
         send_mutex.lock();
         int ret = can_dev->send(msg_id, canMsgLen[SET_INPUT_POS], data);
         send_mutex.unlock();
         if (ret < 0)
         {
-            std::cout << "[ERROR]  on axis" << axisID << " - SET_INPUT_POS. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << axisID << " - SET_INPUT_POS. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         }
 
@@ -745,13 +649,13 @@ int OdriveCan::call_set_input_vel(int axisID, float input_vel, float input_torqu
 #endif
 
         char data[8];
-        this->get_char_from_nums<float>(data, input_vel, input_torque_ff);
+        get_char_from_nums<float>(data, input_vel, input_torque_ff, lsb);
         send_mutex.lock();
         int ret = can_dev->send(msg_id, canMsgLen[SET_INPUT_VEL], data);
         send_mutex.unlock();
         if (ret < 0)
         {
-            std::cout << "[ERROR]  on axis" << axisID << " - SET_INPUT_VEL. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << axisID << " - SET_INPUT_VEL. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         };
         this->axes[axes_ids[axisID]]->update_input_vel(input_vel, input_torque_ff);
@@ -775,13 +679,13 @@ int OdriveCan::call_set_input_torque(int axisID, float torque)
 #endif
 
         char data[4];
-        this->get_char_from_num<float>(data, torque);
+        get_char_from_num<float>(data, torque, lsb);
         send_mutex.lock();
         int ret = can_dev->send(msg_id, canMsgLen[SET_INPUT_TORQUE], data);
         send_mutex.unlock();
         if (ret < 0)
         {
-            std::cout << "[ERROR]  on axis" << axisID << " - SET_INPUT_TORQUE. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << axisID << " - SET_INPUT_TORQUE. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         };
 
@@ -807,13 +711,13 @@ int OdriveCan::call_set_limits(int axisID, float velocity, float current)
 #endif
 
         char data[8];
-        this->get_char_from_nums<float>(data, velocity, current);
+        get_char_from_nums<float>(data, velocity, current, lsb);
         send_mutex.lock();
         int ret = can_dev->send(msg_id, canMsgLen[SET_LIMITS], data);
         send_mutex.unlock();
         if (ret < 0)
         {
-            std::cout << "[ERROR]  on axis" << axisID << " - SET_LIMITS. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << axisID << " - SET_LIMITS. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         };
 
@@ -842,7 +746,7 @@ int OdriveCan::call_start_anticogging(int axisID)
         send_mutex.unlock();
         if (ret < 0)
         {
-            std::cout << "[ERROR]  on axis" << axisID << " - START_ANTICOGGING. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << axisID << " - START_ANTICOGGING. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         }
 
@@ -868,13 +772,13 @@ int OdriveCan::call_set_traj_vel_limit(int axisID, float lim)
 #endif
 
         char data[4];
-        this->get_char_from_num<float>(data, lim);
+        get_char_from_num<float>(data, lim, lsb);
         send_mutex.lock();
         int ret = can_dev->send(msg_id, canMsgLen[SET_TRAJ_VEL_LIMIT], data);
         send_mutex.unlock();
         if (ret < 0)
         {
-            std::cout << "[ERROR]  on axis" << axisID << " - SET_TRAJ_VEL_LIMIT. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << axisID << " - SET_TRAJ_VEL_LIMIT. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         };
 
@@ -900,13 +804,13 @@ int OdriveCan::call_set_traj_accel_limits(int axisID, float accel, float decel)
 #endif
 
         char data[8];
-        this->get_char_from_nums<float>(data, accel, decel);
+        get_char_from_nums<float>(data, accel, decel, lsb);
         send_mutex.lock();
         int ret = can_dev->send(msg_id, canMsgLen[SET_TRAJ_ACCEL_LIMITS], data);
         send_mutex.unlock();
         if (ret < 0)
         {
-            std::cout << "[ERROR]  on axis" << axisID << " - SET_TRAJ_ACCEL_LIMITS. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << axisID << " - SET_TRAJ_ACCEL_LIMITS. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         };
 
@@ -932,13 +836,13 @@ int OdriveCan::call_set_traj_inertia(int axisID, float inertia)
 #endif
 
         char data[4];
-        this->get_char_from_num<float>(data, inertia);
+        get_char_from_num<float>(data, inertia, lsb);
         send_mutex.lock();
         int ret = can_dev->send(msg_id, canMsgLen[SET_TRAJ_INERTIA], data);
         send_mutex.unlock();
         if (ret < 0)
         {
-            std::cout << "[ERROR]  on axis" << axisID << " - SET_TRAJ_INERTIA. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << axisID << " - SET_TRAJ_INERTIA. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         };
 
@@ -967,7 +871,7 @@ int OdriveCan::call_get_iq(int axisID)
         send_mutex.unlock();
         if (ret < 0)
         {
-            std::cout << "[ERROR]  on axis" << axisID << " - GET_IQ. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << axisID << " - GET_IQ. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         }
 
@@ -991,7 +895,7 @@ int OdriveCan::call_get_tempterature(int axisID)
         send_mutex.unlock();
         if (ret < 0)
         {
-            std::cout << "[ERROR]  on axis" << axisID << " - GET_TEMP. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << axisID << " - GET_TEMP. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         }
 
@@ -1015,7 +919,7 @@ int OdriveCan::call_reboot(int axisID)
         send_mutex.unlock();
         if (ret < 0)
         {
-            std::cout << "[ERROR]  on axis" << axisID << " - REBOOT. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << axisID << " - REBOOT. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         }
 
@@ -1044,7 +948,7 @@ int OdriveCan::call_get_bus_ui(int axisID)
         if (ret < 0)
         {
 
-            std::cout << "[ERROR]  on axis" << axisID << " - GET_BUS_VOLTAGE_CURRENT. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << axisID << " - GET_BUS_VOLTAGE_CURRENT. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         }
 
@@ -1069,7 +973,7 @@ int OdriveCan::call_clear_errors(int axisID)
         if (ret < 0)
         {
 
-            std::cout << "[ERROR]  on axis" << axisID << " - CLEAR_ERRORS. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << axisID << " - CLEAR_ERRORS. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         }
 
@@ -1090,14 +994,14 @@ int OdriveCan::call_set_absolute_position(int axisID, float pos)
 #endif
 
         char data[4];
-        this->get_char_from_num<float>(data, pos);
+        get_char_from_num<float>(data, pos, lsb);
         send_mutex.lock();
         int ret = can_dev->send(msg_id, canMsgLen[SET_ABSOLUTE_POSITION], data);
         send_mutex.unlock();
         if (ret < 0)
         {
 
-            std::cout << "[ERROR]  on axis" << axisID << " - SET_ABSOLUTE_POSITION. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << axisID << " - SET_ABSOLUTE_POSITION. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         };
 
@@ -1119,14 +1023,14 @@ int OdriveCan::call_set_pos_gain(int axisID, float gain)
 #endif
 
         char data[4];
-        this->get_char_from_num<float>(data, gain);
+        get_char_from_num<float>(data, gain, lsb);
         send_mutex.lock();
         int ret = can_dev->send(msg_id, canMsgLen[SET_POS_GAIN], data);
         send_mutex.unlock();
         if (ret < 0)
         {
 
-            std::cout << "[ERROR]  on axis" << axisID << " - SET_POS_GAIN. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << axisID << " - SET_POS_GAIN. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         };
 
@@ -1151,14 +1055,14 @@ int OdriveCan::call_set_vel_gains(int axisID, float gain, float integrator)
 #endif
 
         char data[8];
-        this->get_char_from_nums<float>(data, gain, integrator);
+        get_char_from_nums<float>(data, gain, integrator, lsb);
         send_mutex.lock();
         int ret = can_dev->send(msg_id, canMsgLen[SET_VEL_GAINS], data);
         send_mutex.unlock();
         if (ret < 0)
         {
 
-            std::cout << "[ERROR]  on axis" << axisID << " - SET_VEL_GAINS. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << axisID << " - SET_VEL_GAINS. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         };
 
@@ -1184,7 +1088,7 @@ int OdriveCan::call_get_adc_voltage(int axisID)
         if (ret < 0)
         {
 
-            std::cout << "[ERROR]  on axis" << axisID << " - GET_ADC_VOLTAGE. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << axisID << " - GET_ADC_VOLTAGE. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         }
 
@@ -1209,7 +1113,7 @@ int OdriveCan::call_get_controller_error(int axisID)
         if (ret < 0)
         {
 
-            std::cout << "[ERROR]  on axis" << axisID << " - GET_CONTROLLER_ERROR. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << axisID << " - GET_CONTROLLER_ERROR. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         }
 
@@ -1234,7 +1138,7 @@ int OdriveCan::call_enter_dfu_mode(int axisID)
         if (ret < 0)
         {
 
-            std::cout << "[ERROR]  on axis" << axisID << " - ENTER_DFU_MODE. The wrong number of bytes were written to CAN" << std::endl;
+            std::cerr << "[ERROR] on axis" << axisID << " - ENTER_DFU_MODE. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         }
 

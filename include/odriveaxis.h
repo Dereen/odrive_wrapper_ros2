@@ -178,6 +178,7 @@ public:
     uint32_t get_controll_mode();
 
     uint32_t get_input_mode();
+    bool axis_is_in_error();
 
     void update_input_pos(float input_pos, float vel_ff, float torque_ff);
 

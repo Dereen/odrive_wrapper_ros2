@@ -40,7 +40,7 @@ int CanDevice::send(uint16_t id, uint16_t dlc, char * data, bool rtr)
 		return -1;
 	}
 
-	#ifndef DEBUG
+	#ifdef DEBUG
 	printf("-> 0x%03X [%d] ", f.can_id, f.can_dlc);
 
 	for (int i = 0; i < f.can_dlc; i++)
@@ -68,11 +68,11 @@ int CanDevice::send(uint16_t id, uint16_t dlc, bool rtr)
 	int ret = write(s, &f, sizeof(struct can_frame)) ;
 	if (ret != sizeof(struct can_frame))	{
 		perror("[CanDev] Write error");
-		std::cout << "wrote " << ret << "bytes\n";
+		std::cout << "wrote " << ret << " bytes\n";
 		return -1;
 	}
 
-	#ifndef DEBUG
+	#ifdef DEBUG
 	printf("-> 0x%03X [%d] ", f.can_id, f.can_dlc);
 
 	for (int i = 0; i < f.can_dlc; i++)

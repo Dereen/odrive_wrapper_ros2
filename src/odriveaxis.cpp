@@ -104,6 +104,10 @@ void OdriveAxis::init()
     reg->timestamp.tv_sec = -1;
 }
 
+bool OdriveAxis::axis_is_in_error(){
+    return (err->axis_error != AXIS_ERROR_NONE);
+}
+
 void OdriveAxis::set_axis_version(uint8_t hw_version_major, uint8_t hw_version_minor,
                                   uint8_t hw_version_variant, uint8_t fw_version_major,
                                   uint8_t fw_version_minor, uint8_t fw_version_revision,

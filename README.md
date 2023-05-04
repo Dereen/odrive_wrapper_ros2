@@ -27,7 +27,8 @@ Nebo, se musi pridat uzivateli moznost spoustet sudo prikazy bez hesla
 
 `echo "$USER ALL=(ALL:ALL) NOPASSWD: ALL" | sudo tee "/etc/sudoers.d/dont-prompt-$USER-for-sudo-password"`
 
-
+## Ztrata zprav na CAN
+pokud se zacnou ztracet hromadne zpravy a vypisuje se write error, je treba zvysit periodu mezi jednotlivymi odeslani periodickych pozadavku
 
 ## Požadavky před spuštěním
 Na Usb2CAN tripele má být spušten adapter _triple_.

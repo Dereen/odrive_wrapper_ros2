@@ -28,7 +28,7 @@
 struct updatePeriods
 {
     uint32_t axis_status; /*!<  error, state, done flag */
-    uint32_t data;        /*!<  bus current bus voltage */
+    uint32_t data;        /*!<  bus UI, temperature, encoders ADC */
 };
 
 /**
@@ -53,33 +53,32 @@ class OdriveCan : OdriveAxis
     } canMsg;
 
 public:
-    std::unique_ptr<struct updatePeriods> periods; /*!< time constants at which the periodically updated data will be fetched */
+    std::unique_ptr<struct updatePeriods> periods; /*!< time constants in ms at which the periodically updated data will be fetched */
 
-    friend std::ostream &operator<<(std::ostream &out, OdriveCan const *oc);
-
-    int get_axes_num();
+    friend std::ostream &operator<<(std::ostream &out, OdriveCan const *oc);  // function for nice data printing
 
 private:
-    std::unordered_map<int, int> canMsgLen;
-    int axes_num;
-    std::vector<std::shared_ptr<class OdriveAxis>> axes;
-    std::unordered_map<int, int> axes_ids; /*!< Maps axis ID to index in axes vector */
+    std::unordered_map<int, int> canMsgLen;                     /*!< Map data's part of CAN message length for individual messages */
 
-    int buffer_len;
+    int axes_num;                                               /*!< Number of initialized axes */
+    std::vector<std::shared_ptr<class OdriveAxis>> axes;        /*!< Array of initialized axes */
+    std::unordered_map<int, int> axes_ids;                      /*!< Maps axis ID to index in axes vector */
+
+    int buffer_len;                                             /*!< Buffer length for storing messages for each axis */
     typedef boost::circular_buffer<canMsg> can_circ_buffer;
-    std::vector<std::unique_ptr<can_circ_buffer>> input_buffer; // make a circular buffer for each axis
+    std::vector<std::unique_ptr<can_circ_buffer>> input_buffer; /*!<  A circular buffer for each axis info storage */
 
-    std::unique_ptr<CanDevice> can_dev;
+    std::unique_ptr<CanDevice> can_dev;                         /*!< Class for low level can operations */
 
-    bool run;
+    bool run;                                                   /*!< Flag for finishing threads */
 
-    std::mutex msg_mutex;
-    std::mutex send_mutex;
+    std::mutex buffer_mutex;                                    /*!< Mutex for reading messages from buffers */
+    std::mutex send_mutex;                                      /*!< Mutex for sending messages */
 
-    std::thread th_recieve;
-    std::thread th_process;
-    std::thread th_send;
-    std::thread th_errors;
+    std::thread th_recieve;                                    /*!< Thread that reads messages from CAN interface and stores them into buffers */
+    std::thread th_process;                                    /*!< Thread for processing messages from buffers */
+    std::thread th_send;                                       /*!< Thread for requesting periodic actuator readings */
+    std::thread th_errors;                                     /*!< Thread for fetching errors */
 
     long bit_rate; // can bitrate
 
@@ -151,26 +150,14 @@ public:
         }
         else
         {
-            std::cout << "[ERROR] Got incorrect number of new ID's for the pre-allocated amount of axes" << std::endl;
+            std::cerr << "[ERROR] Got incorrect number of new ID's for the pre-allocated amount of axes" << std::endl;
         }
     };
 
-    /**
-     * @brief Set the data update period
-     *
-     * @param[in] new_period new update period for new temperature, encoder, busUI, motor current  and ADC data requests in us
-     */
-    void set_update_period(time_t new_period);
-
-    /**
-     * @brief Set the status update period
-     *
-     * @param[in] new_period update the period for axis status data requests in us
-     */
-    void set_status_update_period(time_t new_period);
 
     ~OdriveCan()
     {
+        run = false;
         th_recieve.join();
         th_process.join();
         th_send.join();
@@ -178,12 +165,34 @@ public:
     };
 
     /**
+     * @brief Get the number of initalized axis containers
+     * 
+     * @return int number of initialized axis data containers
+     */
+    int get_axes_num(); 
+
+    /**
+     * @brief Set the data update period
+     *
+     * @param[in] new_period new update period for new temperature, encoder, busUI, motor current  and ADC data requests in ms
+     */
+    void set_update_period(time_t new_period);
+
+    /**
+     * @brief Set the status update period
+     *
+     * @param[in] new_period update the period for axis status data requests in ms
+     */
+    void set_status_update_period(time_t new_period);
+
+
+    /**
      * @brief Set the periods object
      *
-     * @param[in] heartbeat period at which heartbeat msg is processed
-     * @param[in] busUI period at which bus voltage and current are updated
+     * @param[in] status period at which heartbeat msg is processed and errors are fetched
+     * @param[in] data_time period at which bus voltage and current, ADC voltage, temperature, encoder estimates are updated
      */
-    void set_periods(int32_t heartbeat, int32_t busUI);
+    void set_periods(int32_t status_time, int32_t data_time);
 
     /**
      * @brief parses recieved can header
@@ -209,16 +218,6 @@ public:
      * @return int axis ID
      */
     int axis_from_header(uint32_t header);
-
-    bool check_msg_error(uint32_t header);
-
-    /**
-     * @brief Function to check if the key is present or not using count()
-     *
-     * @param[in] unordered map in whith the key is searched for
-     * @param[in] key the key, which presence is checked for
-     */
-    bool check_key(std::unordered_map<int, int> m, int key);
 
     void get_errors();
 
@@ -253,24 +252,6 @@ public:
     void parse_adc(int axisID, canMsg msg);
 
     void parse_controller_error(int axisID, canMsg msg);
-
-    uint32_t get32from8(uint8_t *data, int startIdx);
-
-    // void get_char_from_uint(char* arr, uint32_t var);
-
-    template <typename T>
-    void get_char_from_num(char *arr, T var, bool helper = false);
-
-    template <typename T>
-    void get_char_from_nums(char *arr, T var1, T var2);
-
-    template <typename T, typename F>
-    void get_char_from_nums(char *arr, T var1, F var2, F var3);
-
-    template <typename T>
-    void get_char_from_nums(char *arr, T var1, T var2, T var3);
-
-    float get_float(uint32_t f);
 
     // USER called functions ---------------------------------------------------------
     /**
