@@ -266,7 +266,7 @@ std::ostream &operator<<(std::ostream &out, OdriveAxis const *ax)
             << ax->reg->traj_accel_limit << ", \t*" << italic("Deceleration: ") << ax->reg->traj_decel_limit << std::endl;
         out << "\tTrajectory inertia: " << ax->reg->traj_inertia << std::endl;
         out << "\tInput torque: " << ax->reg->input_torque << std::endl;
-        out << "\tAnticogging is  " << (ax->reg->anticogging_timestamp.tv_sec > 0 ? "activated" : "deactivated") << std::endl;
+        out << "\tAnticogging is " << (ax->reg->anticogging_timestamp.tv_sec > 0 ? "activated" : "deactivated") << std::endl;
     }
 
     if (ax->estop.tv_sec > 0)

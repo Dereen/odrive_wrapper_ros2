@@ -85,10 +85,19 @@ void OdriveCan::init()
     // th_errors = std::thread(&OdriveCan::get_errors, this);
 }
 
-void OdriveCan::set_periods(int32_t heartbeat, int32_t busUI)
+void OdriveCan::set_periods(int32_t status_time, int32_t data_time)
 {
-    periods->heartbeat = heartbeat;
-    periods->busIU = busUI;
+    periods->axis_status = status_time;
+    periods->data = data_time;
+}
+void OdriveCan::set_update_period(time_t new_period)
+{
+    this->periods->data = new_period;
+}
+
+void OdriveCan::set_status_update_period(time_t new_period)
+{
+    this->periods->axis_status = new_period;
 }
 
 void OdriveCan::parse_header(uint32_t header, int *axisID, int *cmdID)
@@ -122,6 +131,10 @@ bool OdriveCan::check_msg_error(uint32_t header)
     return CAN_ERR_FLAG & header;
 }
 
+/**
+ * @brief Sends CAN requests for temperature readings, encoder estimates, motor current, and ADC voltage
+ *
+ */
 void OdriveCan::ask_for_current_values()
 {
     std::cout << "[SEND] Start send thread" << std::endl;
@@ -144,7 +157,7 @@ void OdriveCan::ask_for_current_values()
             //  std::cout << "ask for adc voltage" << std::endl;
             call_get_adc_voltage(id);
         }
-        usleep(this->update_period_us);
+        usleep(periods->data);
     }
 }
 
@@ -162,12 +175,11 @@ void OdriveCan::get_errors()
             call_get_error(id);
             call_get_controller_error(id);
         }
-        usleep(this->err_update_period_us);
+        usleep(periods->axis_status);
     }
 }
 
-// Function to check if the key is present or not using count()
-bool check_key(std::unordered_map<int, int> m, int key)
+bool OdriveCan::check_key(std::unordered_map<int, int> m, int key)
 {
     // Key is not present
     if (m.count(key) == 0)
@@ -404,8 +416,7 @@ uint32_t OdriveCan::get32from8(uint8_t *data, int startIdx)
         return data[startIdx] | data[startIdx + 1] << 8 | data[startIdx + 2] << 16 | data[startIdx + 3] << 24;
     else
         return data[startIdx + 3] | data[startIdx + 2] << 8 | data[startIdx + 1] << 16 | data[startIdx] << 24;
-} 
-
+}
 
 /*
 template <typename T>
@@ -443,7 +454,6 @@ void OdriveCan::get_char_from_num(char *arr, T var, bool helper)
 
     if (!this->lsb)
         std::reverse(arr, arr + sizeof(T));
-
 }
 
 template <typename T>
@@ -460,10 +470,10 @@ void OdriveCan::get_char_from_nums(char *arr, T var1, F var2, F var3)
     this->get_char_from_num<F>(arr + sizeof(T), var2);
     this->get_char_from_num<F>(arr + sizeof(T) + sizeof(F), var3);
 
-   /* char *ptr = arr + sizeof(T);
-    memcpy(ptr, &var2, sizeof(F));
-    ptr += sizeof(F);
-    memcpy(ptr, &var3, sizeof(F));*/
+    /* char *ptr = arr + sizeof(T);
+     memcpy(ptr, &var2, sizeof(F));
+     ptr += sizeof(F);
+     memcpy(ptr, &var3, sizeof(F));*/
 }
 
 template <typename T>
@@ -471,12 +481,12 @@ void OdriveCan::get_char_from_nums(char *arr, T var1, T var2, T var3)
 {
     this->get_char_from_num<T>(arr, var1);
     this->get_char_from_num<T>(arr + sizeof(T), var2);
-    this->get_char_from_num<T>(arr + 2*sizeof(T), var3);
+    this->get_char_from_num<T>(arr + 2 * sizeof(T), var3);
 
-   /* char *ptr = arr + sizeof(T);
-    memcpy(ptr, &var2, sizeof(F));
-    ptr += sizeof(F);
-    memcpy(ptr, &var3, sizeof(F));*/
+    /* char *ptr = arr + sizeof(T);
+     memcpy(ptr, &var2, sizeof(F));
+     ptr += sizeof(F);
+     memcpy(ptr, &var3, sizeof(F));*/
 }
 
 std::ostream &operator<<(std::ostream &out, OdriveCan const *oc)
@@ -490,613 +500,746 @@ std::ostream &operator<<(std::ostream &out, OdriveCan const *oc)
     return out;
 }
 
+bool key_present(std::unordered_map<int, int> m, int key)
+{
+    if (m.count(key) == 0)
+        return 0;
+
+    return 1;
+}
+
 int OdriveCan::call_get_version(int axisID)
 {
-    int msg_id = axisID << 5 | GET_VERSION; // axis ID + can msg name
-#ifndef DEBUG
-    std::cout << "[GetVersion] Ask for version - CAN msg ID " << std::hex << msg_id << std::dec << std::endl;
-#endif
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[GET_VERSION], true);
-    send_mutex.unlock();
-    if (ret < 0)
+    if (key_present(axes_ids, axisID))
     {
-        std::cout << "[ERROR]  on axis" << axisID << " - GET_VERSION. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
-    }
+        int msg_id = axisID << 5 | GET_VERSION; // axis ID + can msg name
+#ifndef DEBUG
+        std::cout << "[GetVersion] Ask for version - CAN msg ID " << std::hex << msg_id << std::dec << std::endl;
+#endif
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[GET_VERSION], true);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
+            std::cout << "[ERROR]  on axis" << axisID << " - GET_VERSION. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        }
 
-    return 0;
+        return 0;
+    }
+    else
+        return 1;
 }
 
 int OdriveCan::call_estop(int axisID)
 {
-    int msg_id = axisID << 5 | ESTOP; // axis ID + can msg name
-#ifdef DEBUG
-    std::cout << "[ESTOP] Call estop - CAN msg ID" << std::hex
-              << msg_id << std::dec << std::endl;
-#endif
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[ESTOP]);
-    send_mutex.unlock();
-    if (ret < 0)
+    if (key_present(axes_ids, axisID))
     {
-        std::cout << "[ERROR]  on axis" << axisID << " - ESTOP. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
+        int msg_id = axisID << 5 | ESTOP; // axis ID + can msg name
+#ifdef DEBUG
+        std::cout << "[ESTOP] Call estop - CAN msg ID" << std::hex
+                  << msg_id << std::dec << std::endl;
+#endif
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[ESTOP]);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
+            std::cout << "[ERROR]  on axis" << axisID << " - ESTOP. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        }
+
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        this->axes[axes_ids[axisID]]->update_estop(tv);
+
+        return 0;
     }
-
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    this->axes[axes_ids[axisID]]->update_estop(tv);
-
-    return 0;
+    else
+        return 1;
 }
 
 int OdriveCan::call_get_error(int axisID)
 {
-    int msg_id = axisID << 5 | GET_ERROR; // axis ID + can msg name
-#ifdef DEBUG
-    std::cout << "[GetError] Ask for get_error - CAN msg ID" << std::hex << msg_id << std::dec << std::endl;
-#endif
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[GET_ERROR], true);
-    send_mutex.unlock();
-    if (ret < 0)
+    if (key_present(axes_ids, axisID))
     {
-        std::cout << "[ERROR]  on axis" << axisID << " - GET_ERROR. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
-    }
+        int msg_id = axisID << 5 | GET_ERROR; // axis ID + can msg name
+#ifdef DEBUG
+        std::cout << "[GetError] Ask for get_error - CAN msg ID" << std::hex << msg_id << std::dec << std::endl;
+#endif
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[GET_ERROR], true);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
+            std::cout << "[ERROR]  on axis" << axisID << " - GET_ERROR. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        }
 
-    return 0;
+        return 0;
+    }
+    else
+        return 1;
 }
 
 int OdriveCan::call_set_axis_node_id(int oldID, uint32_t newID)
 {
-    int msg_id = oldID << 5 | SET_AXIS_NODE_ID; // axis ID + can msg name
+    if (key_present(axes_ids, oldID))
+    {
+        int msg_id = oldID << 5 | SET_AXIS_NODE_ID; // axis ID + can msg name
 #ifdef DEBUG
-    std::cout << "[SetAxisNodeID] Ask for set_axis_node_id - CAN msg ID"
-              << std::hex << msg_id << std::dec << std::endl;
+        std::cout << "[SetAxisNodeID] Ask for set_axis_node_id - CAN msg ID"
+                  << std::hex << msg_id << std::dec << std::endl;
 #endif
 
-    char data[4];
-    this->get_char_from_num<uint32_t>(data, newID);
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[SET_AXIS_NODE_ID], data);
-    send_mutex.unlock();
-    if (ret < 0)
-    {
-        std::cout << "[ERROR]  on axis" << oldID << " - SET_AXIS_NODE_ID. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
+        char data[4];
+        this->get_char_from_num<uint32_t>(data, newID);
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[SET_AXIS_NODE_ID], data);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
+            std::cout << "[ERROR]  on axis" << oldID << " - SET_AXIS_NODE_ID. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        }
+
+        // store corresponding index to old id
+        int tmp = axes_ids[oldID];
+        // delete old reference
+        this->axes_ids.erase(oldID);
+
+        // create new instance
+        this->axes_ids[newID] = tmp;
+
+        return 0;
     }
-
-    // store corresponding index to old id
-    int tmp = axes_ids[oldID];
-    // delete old reference
-    this->axes_ids.erase(oldID);
-
-    // create new instance
-    this->axes_ids[newID] = tmp;
-
-    return 0;
+    else
+        return 1;
 }
 
 int OdriveCan::call_set_axis_state(int axisID, uint32_t req_state)
 {
+    if (key_present(axes_ids, axisID))
+    {
 
-    int msg_id = axisID << 5 | SET_AXIS_STATE; // axis ID + can msg name
+        int msg_id = axisID << 5 | SET_AXIS_STATE; // axis ID + can msg name
 #ifdef DEBUG
-    std::cout << "[SetAxisState]  Ask for set_axis_state - CAN msg ID"
-              << std::hex << msg_id << std::dec << std::endl;
+        std::cout << "[SetAxisState]  Ask for set_axis_state - CAN msg ID"
+                  << std::hex << msg_id << std::dec << std::endl;
 #endif
 
-    char data[4];
-    this->get_char_from_num<uint32_t>(data, req_state);
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[SET_AXIS_STATE], data);
-    send_mutex.unlock();
-    if (ret < 0)
-    {
-        std::cout << "[ERROR]  on axis" << axisID << " - SET_AXIS_STATE. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
-    }
+        char data[4];
+        this->get_char_from_num<uint32_t>(data, req_state);
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[SET_AXIS_STATE], data);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
+            std::cout << "[ERROR]  on axis" << axisID << " - SET_AXIS_STATE. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        }
 
-    this->axes[axes_ids[axisID]]->update_axis_requested_state(req_state);
-    return 0;
+        this->axes[axes_ids[axisID]]->update_axis_requested_state(req_state);
+        return 0;
+    }
+    else
+        return 1;
 };
 
 int OdriveCan::call_get_encoder_estimates(int axisID)
 {
-    int msg_id = (axisID * 0x20) + GET_ENCODER_ESTIMATES; // axis ID + can msg name
-#ifdef DEBUG
-    std::cout << "[GetEncoderEstimates] Ask for encoder estimates -  CAN msg ID "
-              << std::hex << msg_id << std::dec << std::endl;
-#endif
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[GET_ENCODER_ESTIMATES], true);
-    send_mutex.unlock();
-    if (ret < 0)
+    if (key_present(axes_ids, axisID))
     {
-        std::cout << "[ERROR]  on axis" << axisID << " - GET_ENCODER_ESTIMATES. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
-    }
+        int msg_id = (axisID * 0x20) + GET_ENCODER_ESTIMATES; // axis ID + can msg name
+#ifdef DEBUG
+        std::cout << "[GetEncoderEstimates] Ask for encoder estimates -  CAN msg ID "
+                  << std::hex << msg_id << std::dec << std::endl;
+#endif
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[GET_ENCODER_ESTIMATES], true);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
+            std::cout << "[ERROR]  on axis" << axisID << " - GET_ENCODER_ESTIMATES. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        }
 
-    return 0;
+        return 0;
+    }
+    else
+        return 1;
 };
 
 int OdriveCan::call_set_controller_mode(int axisID, uint32_t control_mode, uint32_t input_mode)
 {
-    // construct can message
-    int msg_id = axisID << 5 | SET_CONTROLLER_MODE; // axis ID + can msg name
+    if (key_present(axes_ids, axisID))
+    {
+        // construct can message
+        int msg_id = axisID << 5 | SET_CONTROLLER_MODE; // axis ID + can msg name
 #ifndef DEBUG
-    std::cout << "[SetControlerMode] Ask to set controller mode - CAN msg ID"
-              << std::hex << msg_id << std::dec << std::endl;
+        std::cout << "[SetControlerMode] Ask to set controller mode - CAN msg ID"
+                  << std::hex << msg_id << std::dec << std::endl;
 #endif
 
-    char data[8];
-    this->get_char_from_nums<uint32_t>(data, control_mode, input_mode);
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[SET_CONTROLLER_MODE], data);
-    send_mutex.unlock();
-    if (ret < 0)
-    {
-        std::cout << "[ERROR]  on axis" << axisID << " - SET_CONTROLLER_MODE. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
+        char data[8];
+        this->get_char_from_nums<uint32_t>(data, control_mode, input_mode);
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[SET_CONTROLLER_MODE], data);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
+            std::cout << "[ERROR]  on axis" << axisID << " - SET_CONTROLLER_MODE. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        }
+
+        this->axes[axes_ids[axisID]]->update_controller_mode(control_mode, input_mode);
+
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
+        return 0;
     }
-
-    this->axes[axes_ids[axisID]]->update_controller_mode(control_mode, input_mode);
-
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
-    return 0;
+    else
+        return 1;
 };
 
 int OdriveCan::call_set_input_pos(int axisID, float input_pos, float vel_ff, float torque_ff)
 {
-    int msg_id = axisID << 5 | SET_INPUT_POS; // axis ID + can msg name
+    if (key_present(axes_ids, axisID))
+    {
+        int msg_id = axisID << 5 | SET_INPUT_POS; // axis ID + can msg name
 #ifdef DEBUG
-    std::cout << "[SetInputPos] Ask to set input position - CAN msg ID"
-              << std::hex << msg_id << std::dec << std::endl;
+        std::cout << "[SetInputPos] Ask to set input position - CAN msg ID"
+                  << std::hex << msg_id << std::dec << std::endl;
 #endif
 
-    char data[8];
-    this->get_char_from_nums< float>(data, input_pos, vel_ff, torque_ff);
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[SET_INPUT_POS], data);
-    send_mutex.unlock();
-    if (ret < 0)
-    {
-        std::cout << "[ERROR]  on axis" << axisID << " - SET_INPUT_POS. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
-    }
+        char data[8];
+        this->get_char_from_nums<float>(data, input_pos, vel_ff, torque_ff);
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[SET_INPUT_POS], data);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
+            std::cout << "[ERROR]  on axis" << axisID << " - SET_INPUT_POS. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        }
 
-    this->axes[axes_ids[axisID]]->update_input_pos(input_pos, vel_ff, torque_ff);
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
-    return 0;
+        this->axes[axes_ids[axisID]]->update_input_pos(input_pos, vel_ff, torque_ff);
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
+        return 0;
+    }
+    else
+        return 1;
 };
 
 int OdriveCan::call_set_input_vel(int axisID, float input_vel, float input_torque_ff)
 {
-    int msg_id = axisID << 5 | SET_INPUT_VEL; // axis ID + can msg name
+    if (key_present(axes_ids, axisID))
+    {
+        int msg_id = axisID << 5 | SET_INPUT_VEL; // axis ID + can msg name
 #ifdef DEBUG
-    std::cout << "[SetInputVel] Ask to set input velocity - CAN msg ID"
-              << std::hex << msg_id << std::dec << std::endl;
+        std::cout << "[SetInputVel] Ask to set input velocity - CAN msg ID"
+                  << std::hex << msg_id << std::dec << std::endl;
 #endif
 
-    char data[8];
-    this->get_char_from_nums<float>(data, input_vel, input_torque_ff);
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[SET_INPUT_VEL], data);
-    send_mutex.unlock();
-    if (ret < 0)
-    {
-        std::cout << "[ERROR]  on axis" << axisID << " - SET_INPUT_VEL. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
-    };
-    this->axes[axes_ids[axisID]]->update_input_vel(input_vel, input_torque_ff);
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
-    return 0;
+        char data[8];
+        this->get_char_from_nums<float>(data, input_vel, input_torque_ff);
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[SET_INPUT_VEL], data);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
+            std::cout << "[ERROR]  on axis" << axisID << " - SET_INPUT_VEL. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        };
+        this->axes[axes_ids[axisID]]->update_input_vel(input_vel, input_torque_ff);
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
+        return 0;
+    }
+    else
+        return 1;
 }
 
 int OdriveCan::call_set_input_torque(int axisID, float torque)
 {
-
-    int msg_id = axisID << 5 | SET_INPUT_TORQUE; // axis ID + can msg name
+    if (key_present(axes_ids, axisID))
+    {
+        int msg_id = axisID << 5 | SET_INPUT_TORQUE; // axis ID + can msg name
 #ifdef DEBUG
-    std::cout << "[SetInputTorque] Ask to set input torque - CAN msg ID"
-              << std::hex << msg_id << std::dec << std::endl;
+        std::cout << "[SetInputTorque] Ask to set input torque - CAN msg ID"
+                  << std::hex << msg_id << std::dec << std::endl;
 #endif
 
-    char data[4];
-    this->get_char_from_num<float>(data, torque);
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[SET_INPUT_TORQUE], data);
-    send_mutex.unlock();
-    if (ret < 0)
-    {
-        std::cout << "[ERROR]  on axis" << axisID << " - SET_INPUT_TORQUE. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
-    };
+        char data[4];
+        this->get_char_from_num<float>(data, torque);
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[SET_INPUT_TORQUE], data);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
+            std::cout << "[ERROR]  on axis" << axisID << " - SET_INPUT_TORQUE. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        };
 
-    this->axes[axes_ids[axisID]]->update_input_torque(torque);
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
+        this->axes[axes_ids[axisID]]->update_input_torque(torque);
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
 
-    return 0;
+        return 0;
+    }
+    else
+        return 1;
 };
 
 int OdriveCan::call_set_limits(int axisID, float velocity, float current)
 {
-    int msg_id = axisID << 5 | SET_LIMITS; // axis ID + can msg name
+    if (key_present(axes_ids, axisID))
+    {
+        int msg_id = axisID << 5 | SET_LIMITS; // axis ID + can msg name
 #ifdef DEBUG
-    std::cout << "[SetLimits] Ask to set velocity and current limits - CAN msg ID"
-              << std::hex << msg_id << std::dec << std::endl;
+        std::cout << "[SetLimits] Ask to set velocity and current limits - CAN msg ID"
+                  << std::hex << msg_id << std::dec << std::endl;
 #endif
 
-    char data[8];
-    this->get_char_from_nums<float>(data, velocity, current);
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[SET_LIMITS], data);
-    send_mutex.unlock();
-    if (ret < 0)
-    {
-        std::cout << "[ERROR]  on axis" << axisID << " - SET_LIMITS. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
-    };
+        char data[8];
+        this->get_char_from_nums<float>(data, velocity, current);
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[SET_LIMITS], data);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
+            std::cout << "[ERROR]  on axis" << axisID << " - SET_LIMITS. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        };
 
-    this->axes[axes_ids[axisID]]->update_limits(velocity, current);
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
+        this->axes[axes_ids[axisID]]->update_limits(velocity, current);
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
 
-    return 0;
+        return 0;
+    }
+    else
+        return 1;
 };
 
 int OdriveCan::call_start_anticogging(int axisID)
 {
-    int msg_id = axisID << 5 | START_ANTICOGGING; // axis ID + can msg name
-#ifdef DEBUG
-    std::cout << "[Anticogging] Ask to start anticogging" << std::hex
-              << msg_id << std::dec << std::endl;
-#endif
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[START_ANTICOGGING]);
-    send_mutex.unlock();
-    if (ret < 0)
+    if (key_present(axes_ids, axisID))
     {
-        std::cout << "[ERROR]  on axis" << axisID << " - START_ANTICOGGING. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
+        int msg_id = axisID << 5 | START_ANTICOGGING; // axis ID + can msg name
+#ifdef DEBUG
+        std::cout << "[Anticogging] Ask to start anticogging" << std::hex
+                  << msg_id << std::dec << std::endl;
+#endif
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[START_ANTICOGGING]);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
+            std::cout << "[ERROR]  on axis" << axisID << " - START_ANTICOGGING. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        }
+
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        this->axes[axes_ids[axisID]]->update_anticogging(tv);
+        this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
+
+        return 0;
     }
-
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    this->axes[axes_ids[axisID]]->update_anticogging(tv);
-    this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
-
-    return 0;
+    else
+        return 1;
 };
 
 int OdriveCan::call_set_traj_vel_limit(int axisID, float lim)
 {
-    int msg_id = axisID << 5 | SET_TRAJ_VEL_LIMIT; // axis ID + can msg name
+    if (key_present(axes_ids, axisID))
+    {
+        int msg_id = axisID << 5 | SET_TRAJ_VEL_LIMIT; // axis ID + can msg name
 #ifdef DEBUG
-    std::cout << "[SetLimits] Ask to set velocity and current limits - CAN msg ID"
-              << std::hex << msg_id << std::dec << std::endl;
+        std::cout << "[SetLimits] Ask to set velocity and current limits - CAN msg ID"
+                  << std::hex << msg_id << std::dec << std::endl;
 #endif
 
-    char data[4];
-    this->get_char_from_num<float>(data, lim);
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[SET_TRAJ_VEL_LIMIT], data);
-    send_mutex.unlock();
-    if (ret < 0)
-    {
-        std::cout << "[ERROR]  on axis" << axisID << " - SET_TRAJ_VEL_LIMIT. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
-    };
+        char data[4];
+        this->get_char_from_num<float>(data, lim);
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[SET_TRAJ_VEL_LIMIT], data);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
+            std::cout << "[ERROR]  on axis" << axisID << " - SET_TRAJ_VEL_LIMIT. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        };
 
-    this->axes[axes_ids[axisID]]->update_traj_vel_limit(lim);
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
+        this->axes[axes_ids[axisID]]->update_traj_vel_limit(lim);
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
 
-    return 0;
+        return 0;
+    }
+    else
+        return 1;
 };
 
 int OdriveCan::call_set_traj_accel_limits(int axisID, float accel, float decel)
 {
-    int msg_id = axisID << 5 | SET_TRAJ_ACCEL_LIMITS; // axis ID + can msg name
+    if (key_present(axes_ids, axisID))
+    {
+        int msg_id = axisID << 5 | SET_TRAJ_ACCEL_LIMITS; // axis ID + can msg name
 #ifdef DEBUG
-    std::cout << "[SetAccelLimits] Ask to set trajectory acceleration and decellerations limits - CAN msg ID"
-              << std::hex << msg_id << std::dec << std::endl;
+        std::cout << "[SetAccelLimits] Ask to set trajectory acceleration and decellerations limits - CAN msg ID"
+                  << std::hex << msg_id << std::dec << std::endl;
 #endif
 
-    char data[8];
-    this->get_char_from_nums<float>(data, accel, decel);
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[SET_TRAJ_ACCEL_LIMITS], data);
-    send_mutex.unlock();
-    if (ret < 0)
-    {
-        std::cout << "[ERROR]  on axis" << axisID << " - SET_TRAJ_ACCEL_LIMITS. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
-    };
+        char data[8];
+        this->get_char_from_nums<float>(data, accel, decel);
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[SET_TRAJ_ACCEL_LIMITS], data);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
+            std::cout << "[ERROR]  on axis" << axisID << " - SET_TRAJ_ACCEL_LIMITS. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        };
 
-    this->axes[axes_ids[axisID]]->update_traj_accel_limit(accel, decel);
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
+        this->axes[axes_ids[axisID]]->update_traj_accel_limit(accel, decel);
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
 
-    return 0;
+        return 0;
+    }
+    else
+        return 1;
 };
 
 int OdriveCan::call_set_traj_inertia(int axisID, float inertia)
 {
-
-    int msg_id = axisID << 5 | SET_TRAJ_INERTIA; // axis ID + can msg name
+    if (key_present(axes_ids, axisID))
+    {
+        int msg_id = axisID << 5 | SET_TRAJ_INERTIA; // axis ID + can msg name
 #ifdef DEBUG
-    std::cout << "[SetAccelLimits] Ask to set trajectory acceleration and decellerations limits - CAN msg ID"
-              << std::hex << msg_id << std::dec << std::endl;
+        std::cout << "[SetAccelLimits] Ask to set trajectory acceleration and decellerations limits - CAN msg ID"
+                  << std::hex << msg_id << std::dec << std::endl;
 #endif
 
-    char data[4];
-    this->get_char_from_num<float>(data, inertia);
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[SET_TRAJ_INERTIA], data);
-    send_mutex.unlock();
-    if (ret < 0)
-    {
-        std::cout << "[ERROR]  on axis" << axisID << " - SET_TRAJ_INERTIA. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
-    };
+        char data[4];
+        this->get_char_from_num<float>(data, inertia);
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[SET_TRAJ_INERTIA], data);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
+            std::cout << "[ERROR]  on axis" << axisID << " - SET_TRAJ_INERTIA. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        };
 
-    this->axes[axes_ids[axisID]]->update_traj_inertia(inertia);
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
+        this->axes[axes_ids[axisID]]->update_traj_inertia(inertia);
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
 
-    return 0;
+        return 0;
+    }
+    else
+        return 1;
 };
 
 int OdriveCan::call_get_iq(int axisID)
 {
-
-    // construct can message
-    int msg_id = (axisID * 0x20) + GET_IQ; // axis ID + can msg name
-#ifdef DEBUG
-    std::cout << "[GetIQ] Ask for IQ  CAN msg ID " << std::hex << msg_id << std::dec << std::endl;
-#endif
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[GET_IQ], true);
-    send_mutex.unlock();
-    if (ret < 0)
+    if (key_present(axes_ids, axisID))
     {
-        std::cout << "[ERROR]  on axis" << axisID << " - GET_IQ. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
-    }
+        // construct can message
+        int msg_id = (axisID * 0x20) + GET_IQ; // axis ID + can msg name
+#ifdef DEBUG
+        std::cout << "[GetIQ] Ask for IQ  CAN msg ID " << std::hex << msg_id << std::dec << std::endl;
+#endif
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[GET_IQ], true);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
+            std::cout << "[ERROR]  on axis" << axisID << " - GET_IQ. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        }
 
-    return 0;
+        return 0;
+    }
+    else
+        return 1;
 };
 
 int OdriveCan::call_get_tempterature(int axisID)
 {
-    // construct can message
-    int msg_id = (axisID * 0x20) + GET_TEMP; // axis ID + can msg name
-#ifdef DEBUG
-    std::cout << "[GetTemp] Ask for temperature CAN msg ID " << std::hex << msg_id << std::dec << std::endl;
-#endif
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[GET_TEMP], true);
-    send_mutex.unlock();
-    if (ret < 0)
+    if (key_present(axes_ids, axisID))
     {
-        std::cout << "[ERROR]  on axis" << axisID << " - GET_TEMP. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
-    }
+        // construct can message
+        int msg_id = (axisID * 0x20) + GET_TEMP; // axis ID + can msg name
+#ifdef DEBUG
+        std::cout << "[GetTemp] Ask for temperature CAN msg ID " << std::hex << msg_id << std::dec << std::endl;
+#endif
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[GET_TEMP], true);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
+            std::cout << "[ERROR]  on axis" << axisID << " - GET_TEMP. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        }
 
-    return 0;
+        return 0;
+    }
+    else
+        return 1;
 };
 
 int OdriveCan::call_reboot(int axisID)
 {
-    int msg_id = axisID << 5 | REBOOT; // axis ID + can msg name
-#ifdef DEBUG
-    std::cout << "[Reboot] Ask to reboot " << std::hex
-              << msg_id << std::dec << std::endl;
-#endif
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[REBOOT]);
-    send_mutex.unlock();
-    if (ret < 0)
+    if (key_present(axes_ids, axisID))
     {
-        std::cout << "[ERROR]  on axis" << axisID << " - REBOOT. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
+        int msg_id = axisID << 5 | REBOOT; // axis ID + can msg name
+#ifdef DEBUG
+        std::cout << "[Reboot] Ask to reboot " << std::hex
+                  << msg_id << std::dec << std::endl;
+#endif
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[REBOOT]);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
+            std::cout << "[ERROR]  on axis" << axisID << " - REBOOT. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        }
+
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        this->axes[axes_ids[axisID]]->update_reboot_timestamp(tv);
+
+        return 0;
     }
-
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    this->axes[axes_ids[axisID]]->update_reboot_timestamp(tv);
-
-    return 0;
+    else
+        return 1;
 };
 
 int OdriveCan::call_get_bus_ui(int axisID)
 {
-
-    // construct can message
-    int msg_id = (axisID * 0x20) + GET_BUS_VOLTAGE_CURRENT; // axis ID + can msg name
-#ifdef DEBUG
-    std::cout << "[GetBusUI] Ask for UI  CAN msg ID " << std::hex << msg_id << std::dec << std::endl;
-#endif
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[GET_BUS_VOLTAGE_CURRENT], true);
-    send_mutex.unlock();
-    if (ret < 0)
+    if (key_present(axes_ids, axisID))
     {
+        // construct can message
+        int msg_id = (axisID * 0x20) + GET_BUS_VOLTAGE_CURRENT; // axis ID + can msg name
+#ifdef DEBUG
+        std::cout << "[GetBusUI] Ask for UI  CAN msg ID " << std::hex << msg_id << std::dec << std::endl;
+#endif
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[GET_BUS_VOLTAGE_CURRENT], true);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
 
-        std::cout << "[ERROR]  on axis" << axisID << " - GET_BUS_VOLTAGE_CURRENT. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
+            std::cout << "[ERROR]  on axis" << axisID << " - GET_BUS_VOLTAGE_CURRENT. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        }
+
+        return 0;
     }
-
-    return 0;
+    else
+        return 1;
 };
 
 int OdriveCan::call_clear_errors(int axisID)
 {
-
-    int msg_id = axisID << 5 | CLEAR_ERRORS; // axis ID + can msg name
-#ifdef DEBUG
-    std::cout << "[Reboot] Ask to clear errors" << std::hex
-              << msg_id << std::dec << std::endl;
-#endif
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[CLEAR_ERRORS]);
-    send_mutex.unlock();
-    if (ret < 0)
+    if (key_present(axes_ids, axisID))
     {
+        int msg_id = axisID << 5 | CLEAR_ERRORS; // axis ID + can msg name
+#ifdef DEBUG
+        std::cout << "[Reboot] Ask to clear errors" << std::hex
+                  << msg_id << std::dec << std::endl;
+#endif
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[CLEAR_ERRORS]);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
 
-        std::cout << "[ERROR]  on axis" << axisID << " - CLEAR_ERRORS. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
+            std::cout << "[ERROR]  on axis" << axisID << " - CLEAR_ERRORS. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        }
+
+        return 0;
     }
-
-    return 0;
+    else
+        return 1;
 };
 
 int OdriveCan::call_set_absolute_position(int axisID, float pos)
 {
-    int msg_id = axisID << 5 | SET_ABSOLUTE_POSITION; // axis ID + can msg name
+    if (key_present(axes_ids, axisID))
+    {
+        int msg_id = axisID << 5 | SET_ABSOLUTE_POSITION; // axis ID + can msg name
 #ifdef DEBUG
-    std::cout << "[SetAbsolutePos] Ask to set absolute position to " << (unsigned)pos << " - CAN msg ID"
-              << std::hex << msg_id << std::dec << std::endl;
+        std::cout << "[SetAbsolutePos] Ask to set absolute position to " << (unsigned)pos << " - CAN msg ID"
+                  << std::hex << msg_id << std::dec << std::endl;
 #endif
 
-    char data[4];
-    this->get_char_from_num<float>(data, pos);
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[SET_ABSOLUTE_POSITION], data);
-    send_mutex.unlock();
-    if (ret < 0)
-    {
+        char data[4];
+        this->get_char_from_num<float>(data, pos);
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[SET_ABSOLUTE_POSITION], data);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
 
-        std::cout << "[ERROR]  on axis" << axisID << " - SET_ABSOLUTE_POSITION. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
-    };
+            std::cout << "[ERROR]  on axis" << axisID << " - SET_ABSOLUTE_POSITION. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        };
 
-    this->axes[axes_ids[axisID]]->update_absolut_pos(pos);
-    return 0;
+        this->axes[axes_ids[axisID]]->update_absolut_pos(pos);
+        return 0;
+    }
+    else
+        return 1;
 };
 
 int OdriveCan::call_set_pos_gain(int axisID, float gain)
 {
-    int msg_id = axisID << 5 | SET_POS_GAIN; // axis ID + can msg name
+    if (key_present(axes_ids, axisID))
+    {
+        int msg_id = axisID << 5 | SET_POS_GAIN; // axis ID + can msg name
 #ifdef DEBUG
-    std::cout << "[SetPositionGain] Ask to set position gain " << (unsigned)gain << " - CAN msg ID"
-              << std::hex << msg_id << std::dec << std::endl;
+        std::cout << "[SetPositionGain] Ask to set position gain " << (unsigned)gain << " - CAN msg ID"
+                  << std::hex << msg_id << std::dec << std::endl;
 #endif
 
-    char data[4];
-    this->get_char_from_num<float>(data, gain);
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[SET_POS_GAIN], data);
-    send_mutex.unlock();
-    if (ret < 0)
-    {
+        char data[4];
+        this->get_char_from_num<float>(data, gain);
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[SET_POS_GAIN], data);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
 
-        std::cout << "[ERROR]  on axis" << axisID << " - SET_POS_GAIN. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
-    };
+            std::cout << "[ERROR]  on axis" << axisID << " - SET_POS_GAIN. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        };
 
-    this->axes[axes_ids[axisID]]->update_pos_gain(gain);
+        this->axes[axes_ids[axisID]]->update_pos_gain(gain);
 
-    return 0;
+        return 0;
+    }
+    else
+
+        return 1;
 };
 
 int OdriveCan::call_set_vel_gains(int axisID, float gain, float integrator)
 {
-    int msg_id = axisID << 5 | SET_VEL_GAINS; // axis ID + can msg name
+    if (key_present(axes_ids, axisID))
+    {
+        int msg_id = axisID << 5 | SET_VEL_GAINS; // axis ID + can msg name
 #ifdef DEBUG
-    std::cout << "[SetVelocityGain] Ask to set velocity gain " << (unsigned)gain << ", integrator gain "
-              << unsigned(integrator) << " - CAN msg ID"
-              << std::hex << msg_id << std::dec << std::endl;
+        std::cout << "[SetVelocityGain] Ask to set velocity gain " << (unsigned)gain << ", integrator gain "
+                  << unsigned(integrator) << " - CAN msg ID"
+                  << std::hex << msg_id << std::dec << std::endl;
 #endif
 
-    char data[8];
-    this->get_char_from_nums<float>(data, gain, integrator);
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[SET_VEL_GAINS], data);
-    send_mutex.unlock();
-    if (ret < 0)
-    {
+        char data[8];
+        this->get_char_from_nums<float>(data, gain, integrator);
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[SET_VEL_GAINS], data);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
 
-        std::cout << "[ERROR]  on axis" << axisID << " - SET_VEL_GAINS. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
-    };
+            std::cout << "[ERROR]  on axis" << axisID << " - SET_VEL_GAINS. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        };
 
-    this->axes[axes_ids[axisID]]->update_vel_gains(gain, integrator);
+        this->axes[axes_ids[axisID]]->update_vel_gains(gain, integrator);
 
-    return 0;
+        return 0;
+    }
+    else
+        return 1;
 };
 
 int OdriveCan::call_get_adc_voltage(int axisID)
 {
-
-    int msg_id = (axisID * 0x20) + GET_ADC_VOLTAGE; // axis ID + can msg name
-#ifdef DEBUG
-    std::cout << "[GetADC] Ask for ADC voltage - CAN msg ID " << std::hex << msg_id << std::dec << std::endl;
-#endif
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[GET_ADC_VOLTAGE], true);
-    send_mutex.unlock();
-    if (ret < 0)
+    if (key_present(axes_ids, axisID))
     {
+        int msg_id = (axisID * 0x20) + GET_ADC_VOLTAGE; // axis ID + can msg name
+#ifdef DEBUG
+        std::cout << "[GetADC] Ask for ADC voltage - CAN msg ID " << std::hex << msg_id << std::dec << std::endl;
+#endif
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[GET_ADC_VOLTAGE], true);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
 
-        std::cout << "[ERROR]  on axis" << axisID << " - GET_ADC_VOLTAGE. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
+            std::cout << "[ERROR]  on axis" << axisID << " - GET_ADC_VOLTAGE. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        }
+
+        return 0;
     }
-
-    return 0;
+    else
+        return 1;
 };
 
 int OdriveCan::call_get_controller_error(int axisID)
 {
-    int msg_id = (axisID * 0x20) + GET_CONTROLLER_ERROR; // axis ID + can msg name
-#ifdef DEBUG
-    std::cout << "[GetControllerError] Ask if any errors are in controller - CAN msg ID "
-              << std::hex << msg_id << std::dec << std::endl;
-#endif
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[GET_CONTROLLER_ERROR], true);
-    send_mutex.unlock();
-    if (ret < 0)
+    if (key_present(axes_ids, axisID))
     {
+        int msg_id = (axisID * 0x20) + GET_CONTROLLER_ERROR; // axis ID + can msg name
+#ifdef DEBUG
+        std::cout << "[GetControllerError] Ask if any errors are in controller - CAN msg ID "
+                  << std::hex << msg_id << std::dec << std::endl;
+#endif
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[GET_CONTROLLER_ERROR], true);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
 
-        std::cout << "[ERROR]  on axis" << axisID << " - GET_CONTROLLER_ERROR. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
+            std::cout << "[ERROR]  on axis" << axisID << " - GET_CONTROLLER_ERROR. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        }
+
+        return 0;
     }
-
-    return 0;
+    else
+        return 1;
 };
 
 int OdriveCan::call_enter_dfu_mode(int axisID)
 {
-    int msg_id = axisID << 5 | ENTER_DFU_MODE; // axis ID + can msg name
-#ifdef DEBUG
-    std::cout << "[DFU] Ask to enter DFU mode" << std::hex
-              << msg_id << std::dec << std::endl;
-#endif
-    send_mutex.lock();
-    int ret = can_dev->send(msg_id, canMsgLen[ENTER_DFU_MODE]);
-    send_mutex.unlock();
-    if (ret < 0)
+    if (key_present(axes_ids, axisID))
     {
+        int msg_id = axisID << 5 | ENTER_DFU_MODE; // axis ID + can msg name
+#ifdef DEBUG
+        std::cout << "[DFU] Ask to enter DFU mode" << std::hex
+                  << msg_id << std::dec << std::endl;
+#endif
+        send_mutex.lock();
+        int ret = can_dev->send(msg_id, canMsgLen[ENTER_DFU_MODE]);
+        send_mutex.unlock();
+        if (ret < 0)
+        {
 
-        std::cout << "[ERROR]  on axis" << axisID << " - ENTER_DFU_MODE. The wrong number of bytes were written to CAN" << std::endl;
-        return ret;
+            std::cout << "[ERROR]  on axis" << axisID << " - ENTER_DFU_MODE. The wrong number of bytes were written to CAN" << std::endl;
+            return ret;
+        }
+
+        return 0;
     }
-
-    return 0;
+    else
+        return 1;
 };

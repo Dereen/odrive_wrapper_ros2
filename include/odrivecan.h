@@ -3,7 +3,7 @@
  * @author Anna Zigajkova (zigajkova@jettyvision.cz)
  * @brief Class for Odrive S1 (PRO) CAN messages ID
  * @version 0.1
- * @date 2023-03-03
+ * @date 2023-05-04
  *
  * @copyright Copyright (c) 2023
  * see https://docs.odriverobotics.com/v/latest/can-protocol.html#transport-protocol
@@ -27,22 +27,21 @@
  */
 struct updatePeriods
 {
-    uint32_t heartbeat; /*!<  error, state, done flag */
-    uint32_t busIU;     /*!<  bus current bus voltage */
+    uint32_t axis_status; /*!<  error, state, done flag */
+    uint32_t data;        /*!<  bus current bus voltage */
 };
 
-
 /**
- * @brief A class for communicating with odrive axes by CAN messges.
- * 
- * The class expects the axes to be enumerated continuously from 0. 
+ * @brief A class for communicating with odrive axes by CAN messges in ver. 0.6.4
+ *
+ * In the basic configuration the class expects the axes to be enumerated continuously from 0.
  *       So that if four axes are connected the axes_num = 4 , the expected axes ID are {0, 1, 2, 3}.
- *       Any other ID's are ignored.
- * 
+ *       Any other ID's are ignored. If your axes have different ids, you can use OdriveCan(int axes_num, std::vector<int> ax_ids).
+ *
  * Note: in Odrive's simpleCAN implementation, the CAN's error message is incorrectly  implemented.
- *       Instead of sending the return message with CAN_ERR_FLAG, Odrive returns message filled with 0's, 
- *       which can be easily misinterpreted as the response of Axis0 to get_version. 
- *       Therefore, do not use the axis0, set axes_num = number of used axes + 1 and ignore data stored at axis0. 
+ *       Instead of sending the return message with CAN_ERR_FLAG, Odrive returns message filled with 0's,
+ *       which can be easily misinterpreted as the response of Axis0 to get_version.
+ *       Therefore, do not use the axis0, set axes_num = number of used axes + 1 and ignore data stored at axis0.
  */
 class OdriveCan : OdriveAxis
 {
@@ -64,7 +63,7 @@ private:
     std::unordered_map<int, int> canMsgLen;
     int axes_num;
     std::vector<std::shared_ptr<class OdriveAxis>> axes;
-    std::unordered_map<int, int> axes_ids;  /*!< Maps axis ID to index in axes vector */
+    std::unordered_map<int, int> axes_ids; /*!< Maps axis ID to index in axes vector */
 
     int buffer_len;
     typedef boost::circular_buffer<canMsg> can_circ_buffer;
@@ -82,12 +81,9 @@ private:
     std::thread th_send;
     std::thread th_errors;
 
-    int update_period_us;
-    int err_update_period_us;
+    long bit_rate; // can bitrate
 
-    long bit_rate;  // can bitrate
-
-    std::string dev_name;  // conencted device's system name
+    std::string dev_name; // conencted device's system name
 
     bool lsb; // defines is architecture is Least Significant Bit
 
@@ -125,17 +121,53 @@ private:
     void init();
 
 public:
-
-    OdriveCan() : axes_num(6), buffer_len(10), run(1), update_period_us(100000), err_update_period_us(10000), lsb(true)
+    OdriveCan() : axes_num(6), buffer_len(10), run(1), lsb(true)
     {
         std::cout << "[OdriveCAN] Init Ordive can constructor" << std::endl;
         this->init();
     };
 
-    OdriveCan(int axes_num) :  axes_num(axes_num), buffer_len(10), run(1), update_period_us(100000),  err_update_period_us(10000), lsb(true)
+    OdriveCan(int axes_num) : axes_num(axes_num), buffer_len(10), run(1), lsb(true)
     {
         this->init();
     };
+
+    OdriveCan(int axes_num, std::vector<int> ax_ids) : axes_num(axes_num), buffer_len(10), run(1), lsb(true)
+    {
+        this->init();
+
+        // check if correct number of indexes was passed
+        if (ax_ids.size() == this->axes_ids.size())
+        {
+            // delete all map
+            this->axes_ids.clear();
+
+            for (int i = 0; i < axes_num; i++)
+            {
+
+                // create new instance
+                this->axes_ids[ax_ids[i]] = i;
+            }
+        }
+        else
+        {
+            std::cout << "[ERROR] Got incorrect number of new ID's for the pre-allocated amount of axes" << std::endl;
+        }
+    };
+
+    /**
+     * @brief Set the data update period
+     *
+     * @param[in] new_period new update period for new temperature, encoder, busUI, motor current  and ADC data requests in us
+     */
+    void set_update_period(time_t new_period);
+
+    /**
+     * @brief Set the status update period
+     *
+     * @param[in] new_period update the period for axis status data requests in us
+     */
+    void set_status_update_period(time_t new_period);
 
     ~OdriveCan()
     {
@@ -180,6 +212,14 @@ public:
 
     bool check_msg_error(uint32_t header);
 
+    /**
+     * @brief Function to check if the key is present or not using count()
+     *
+     * @param[in] unordered map in whith the key is searched for
+     * @param[in] key the key, which presence is checked for
+     */
+    bool check_key(std::unordered_map<int, int> m, int key);
+
     void get_errors();
 
     void ask_for_current_values();
@@ -216,18 +256,18 @@ public:
 
     uint32_t get32from8(uint8_t *data, int startIdx);
 
-   // void get_char_from_uint(char* arr, uint32_t var);
+    // void get_char_from_uint(char* arr, uint32_t var);
 
-    template <typename T> 
-    void get_char_from_num(char *arr, T var, bool helper=false);
+    template <typename T>
+    void get_char_from_num(char *arr, T var, bool helper = false);
 
-    template <typename T> 
+    template <typename T>
     void get_char_from_nums(char *arr, T var1, T var2);
 
     template <typename T, typename F>
     void get_char_from_nums(char *arr, T var1, F var2, F var3);
 
-    template <typename T> 
+    template <typename T>
     void get_char_from_nums(char *arr, T var1, T var2, T var3);
 
     float get_float(uint32_t f);
@@ -235,13 +275,13 @@ public:
     // USER called functions ---------------------------------------------------------
     /**
      * @brief Gets the odrive version by calling get_version message
-     * 
-     * @param[in] axisID 
+     *
+     * @param[in] axisID
      * @return int returns -1 at failure, 0 at sucess
      */
     int call_get_version(int axisID); // NOK returns error - probably not implemented in odrive
 
-    int call_estop(int axisID);  // OK
+    int call_estop(int axisID); // OK
 
     int call_get_error(int axisID);
 
@@ -253,17 +293,17 @@ public:
 
     int call_set_controller_mode(int axisID, uint32_t control_mode, uint32_t input_mode);
 
-    int call_set_input_pos(int axisID, float input_pos, float vel_ff, float torque_ff) ;
+    int call_set_input_pos(int axisID, float input_pos, float vel_ff, float torque_ff);
 
     int call_set_input_vel(int axisID, float input_vel, float input_torque_ff);
 
-    int call_set_input_torque(int axisID, float torque) ;
+    int call_set_input_torque(int axisID, float torque);
 
     int call_set_limits(int axisID, float velocity, float current);
 
-    int call_start_anticogging(int axisID); 
+    int call_start_anticogging(int axisID);
 
-    int call_set_traj_vel_limit(int axisID,  float lim);
+    int call_set_traj_vel_limit(int axisID, float lim);
 
     int call_set_traj_accel_limits(int axisID, float accel, float decel);
 
@@ -275,7 +315,7 @@ public:
 
     int call_reboot(int axisID);
 
-    int call_get_bus_ui(int axisID);  // OK - returns voltage
+    int call_get_bus_ui(int axisID); // OK - returns voltage
 
     int call_clear_errors(int axisID);
 
@@ -290,5 +330,4 @@ public:
     int call_get_controller_error(int axisID);
 
     int call_enter_dfu_mode(int axisID);
-
 };
