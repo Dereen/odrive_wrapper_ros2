@@ -385,6 +385,11 @@ int OdriveAxis::get_axis_id()
     return this->id;
 }
 
+void OdriveAxis::set_axis_id(int id)
+{
+    this->id = id;
+}
+
 void OdriveAxis::update_controller_timestamp(struct timeval t){
     this->reg->timestamp = t;
 }

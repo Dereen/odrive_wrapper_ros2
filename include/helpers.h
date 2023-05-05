@@ -1,4 +1,4 @@
- /*
+ /**
  * @file helpers.h
  * @author Anna Zigajkova (zigajkova@jettyvision.cz)
  * @brief Helper functions for odrive CAN interface

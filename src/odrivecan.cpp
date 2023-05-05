@@ -1,5 +1,5 @@
 /**
- * @file OdriveCan.c
+ * @file odrivecan.cpp
  * @author Anna Zigajkova (zigajkova@jettyvision.cz)
  * @brief Class for Odrive S1 (PRO) CAN messages ID
  * @version 0.1
@@ -13,9 +13,6 @@
 #include <vector>
 #include <memory>
 
-#include "candevice.h"
-#include "odriveaxis.h"
-#include "odrivecan.h"
 #include <boost/circular_buffer.hpp>
 
 #include <thread>
@@ -23,6 +20,8 @@
 #include <unordered_map>
 #include <sys/time.h>
 
+#include "candevice.h"
+#include "odriveaxis.h"
 #include "odrivecan.h"
 #include "helpers.h"
 
@@ -71,10 +70,6 @@ void OdriveCan::init()
         input_buffer.push_back(std::make_unique<can_circ_buffer>(buffer_len));
     }
 
-    // init update periods
-    periods = std::make_unique<struct updatePeriods>();
-    set_periods(100, 100);
-
     // init can listener
     can_dev = std::make_unique<class CanDevice>();
     can_dev->init_connection();
@@ -84,21 +79,6 @@ void OdriveCan::init()
     th_process = std::thread(&OdriveCan::process_msgs, this);
     th_send = std::thread(&OdriveCan::ask_for_current_values, this);
     th_errors = std::thread(&OdriveCan::get_errors, this);
-}
-
-void OdriveCan::set_periods(int32_t status_time, int32_t data_time)
-{
-    periods->axis_status = status_time;
-    periods->data = data_time;
-}
-void OdriveCan::set_update_period(time_t new_period)
-{
-    this->periods->data = new_period;
-}
-
-void OdriveCan::set_status_update_period(time_t new_period)
-{
-    this->periods->axis_status = new_period;
 }
 
 void OdriveCan::parse_header(uint32_t header, int *axisID, int *cmdID)
@@ -145,7 +125,7 @@ void OdriveCan::ask_for_current_values()
             id = it->get_axis_id();
             // std::cout << "ask for temp" << std::endl;
             call_get_tempterature(id);
-            /// std::cout << "ask for bus ui" << std::endl;
+            // std::cout << "ask for bus ui" << std::endl;
             call_get_bus_ui(id);
             // std::cout << "ask for encoder estimates" << std::endl;
             call_get_encoder_estimates(id);
@@ -154,7 +134,7 @@ void OdriveCan::ask_for_current_values()
             //  std::cout << "ask for adc voltage" << std::endl;
             call_get_adc_voltage(id);
         }
-        usleep(periods->data*1000);
+        usleep(data_update_ms*1000);
     }
 }
 
@@ -173,7 +153,7 @@ void OdriveCan::get_errors()
             call_get_controller_error(id);
             
         }
-        usleep(periods->axis_status*1000);
+        usleep(axis_status_update_ms*1000);
     }
 }
 

@@ -18,6 +18,10 @@
 #include "datastructs.h"
 #include "odriveenums.h"
 
+/**
+ * @brief A class for storing Odrive's simpleCAN mesasge data and communication via CAN interface
+ *
+ */
 class OdriveAxis
 {
     friend std::ostream &operator<<(std::ostream &out, const OdriveAxis *obj);

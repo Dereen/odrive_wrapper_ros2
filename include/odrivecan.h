@@ -1,5 +1,5 @@
 /**
- * @file OdriveCan.h
+ * @file odrivecan.h
  * @author Anna Zigajkova (zigajkova@jettyvision.cz)
  * @brief Class for Odrive S1 (PRO) CAN messages ID
  * @version 0.1
@@ -22,26 +22,32 @@
 #include <mutex>
 #include <unordered_map>
 
-/**
- * @brief Time constants at which the periodically updated data will be fetched
- */
-struct updatePeriods
+struct OdriveCanParams
 {
-    uint32_t axis_status; /*!<  error, state, done flag */
-    uint32_t data;        /*!<  bus UI, temperature, encoders ADC */
+    boost::optional<uint32_t> axis_status_update_ms; /*!<  error, state, done flag */
+    boost::optional<uint32_t> data_update_ms;        /*!<  bus UI, temperature, encoders ADC */
+    boost::optional<int> buffer_len;                 /*!< Buffer length for storing messages for each axis */
+    boost::optional<int> axes_num;                   /*!< Number of initialized axes */
+    boost::optional<std::vector<int>> axes_IDs;      /*!< Maps axis ID to index in axes vector */
+    boost::optional<std::string> dev_name;           /*!< conencted device's system name, e.g. can0... */
+    boost::optional<bool> lsb;                       /*!<  defines is architecture is Least Significant Bit */
 };
 
 /**
- * @brief A class for communicating with odrive axes by CAN messges in ver. 0.6.4
+ * @brief A class for communicating with odrive axes by CAN messges (ver. 0.6.6)
  *
  * In the basic configuration the class expects the axes to be enumerated continuously from 0.
  *       So that if four axes are connected the axes_num = 4 , the expected axes ID are {0, 1, 2, 3}.
  *       Any other ID's are ignored. If your axes have different ids, you can use OdriveCan(int axes_num, std::vector<int> ax_ids).
  *
- * Note: in Odrive's simpleCAN implementation, the CAN's error message is incorrectly  implemented.
+ * Note: in Odrive's ver. 0.6.4. simpleCAN implementation, the CAN's error message is incorrectly  implemented.
  *       Instead of sending the return message with CAN_ERR_FLAG, Odrive returns message filled with 0's,
  *       which can be easily misinterpreted as the response of Axis0 to get_version.
- *       Therefore, do not use the axis0, set axes_num = number of used axes + 1 and ignore data stored at axis0.
+ *       It is highly recommended to update the Firmware to version 0.6.6
+ *       If you insist on ver. 0.6.4, do not use the axis0, set axes_num = number of used axes + 1 and ignore data stored at axis0.
+ *
+ * Note: The simpleCAN protocol does not provide timestamps, so the OdriveAxis is filled by timestamp retrieved from socket when
+ *       message is recieved
  */
 class OdriveCan : OdriveAxis
 {
@@ -53,8 +59,6 @@ class OdriveCan : OdriveAxis
     } canMsg;
 
 public:
-    std::unique_ptr<struct updatePeriods> periods; /*!< time constants in ms at which the periodically updated data will be fetched */
-
     friend std::ostream &operator<<(std::ostream &out, OdriveCan const *oc); // function for nice data printing
 
 private:
@@ -80,11 +84,11 @@ private:
     std::thread th_send;    /*!< Thread for requesting periodic actuator readings */
     std::thread th_errors;  /*!< Thread for fetching errors */
 
-    long bit_rate; // can bitrate
+    std::string dev_name; /*!< conencted device's system name */
 
-    std::string dev_name; // conencted device's system name
-
-    bool lsb; // defines is architecture is Least Significant Bit
+    bool lsb;                       // defines is architecture is Least Significant Bit
+    uint32_t axis_status_update_ms; /*!<  error, state, done flag */
+    uint32_t data_update_ms;        /*!<  bus UI, temperature, encoders ADC */
 
     enum
     {
@@ -120,40 +124,49 @@ private:
     void init();
 
 public:
-    OdriveCan() : axes_num(6), buffer_len(10), run(1), lsb(true)
-    {
-        std::cout << "[OdriveCAN] Init Ordive can constructor" << std::endl;
-        this->init();
-    };
-
-    OdriveCan(int axes_num) : axes_num(axes_num), buffer_len(10), run(1), lsb(false)
+    OdriveCan(int axes_num = 6) : axes_num(axes_num), buffer_len(10), run(1), lsb(false), axis_status_update_ms(100), data_update_ms(100)
     {
         this->init();
     };
 
-    OdriveCan(int axes_num, std::vector<int> ax_ids) : axes_num(axes_num), buffer_len(10), run(1), lsb(true)
+    OdriveCan(struct OdriveCanParams param) : axes_num(8), buffer_len(10), run(1), lsb(false), axis_status_update_ms(100), data_update_ms(100)
     {
+        if (param.axes_num != boost::none)
+            this->axes_num = *param.axes_num;
+        if (param.axis_status_update_ms != boost::none)
+            this->axis_status_update_ms = *param.axis_status_update_ms;
+        if (param.data_update_ms != boost::none)
+            this->data_update_ms = *param.data_update_ms;
+        if (param.buffer_len != boost::none)
+            this->buffer_len = *param.buffer_len;
+        if (param.dev_name != boost::none)
+            this->dev_name = *param.dev_name;
+        if (param.lsb != boost::none)
+            this->lsb = *param.lsb;
+
         this->init();
 
-        // check if correct number of indexes was passed
-        if (ax_ids.size() == this->axes_ids.size())
+        if ((param.axes_IDs != boost::none))
         {
-            // delete all map
-            this->axes_ids.clear();
+            std::vector<int> arr = *param.axes_IDs;
+            if  (arr.size() == this->axes_ids.size()){
+                // delete all map
+                this->axes_ids.clear();
 
-            for (int i = 0; i < axes_num; i++)
+                for (int i = 0; i < axes_num; i++)
+                {
+                    // create new instance
+                    this->axes_ids[arr[i]] = i;
+
+                    this->axes[i]->set_axis_id(arr[i]);
+                }
+            }   else
             {
-                // create new instance
-                this->axes_ids[ax_ids[i]] = i;
-
-                this->axes[i]->set_axis_id(ax_ids[i]);
+                std::cerr << "[ERROR] Got incorrect number of new ID's for the pre-allocated amount of axes" << std::endl;
             }
         }
-        else
-        {
-            std::cerr << "[ERROR] Got incorrect number of new ID's for the pre-allocated amount of axes" << std::endl;
-        }
     };
+
 
     ~OdriveCan()
     {
@@ -174,7 +187,7 @@ public:
     /**
      * @brief Set the data update period
      *
-     * @param[in] new_period new update period for new temperature, encoder, busUI, motor current  and ADC data requests in ms
+     * @param[in] new_period new update period for new temperature, encoderStruct, busUI, iqStruct  and ADC data requests in ms
      */
     void set_update_period(time_t new_period);
 
@@ -283,7 +296,7 @@ public:
     void parse_encoder_estimates(int axisID, canMsg msg);
 
     /**
-     * @brief Parses resopnse to Get_Iq message
+     * @brief Parses response to Get_Iq message
      *
      * @param[in] axisID axis id to which the message corresponds
      * @param[in] msg recieved data
@@ -291,7 +304,7 @@ public:
     void parse_iq(int axisID, canMsg msg);
 
     /**
-     * @brief Parses resopnse to Get_Temp message
+     * @brief Parses response to Get_Temp message
      *
      * @param[in] axisID axis id to which the message corresponds
      * @param[in] msg recieved data
@@ -299,7 +312,7 @@ public:
     void parse_temp(int axisID, canMsg msg);
 
     /**
-     * @brief Parses resopnse to Get_Bus_Voltage_Current message
+     * @brief Parses response to Get_Bus_Voltage_Current message
      *
      * @param[in] axisID axis id to which the message corresponds
      * @param[in] msg recieved data
@@ -307,7 +320,7 @@ public:
     void parse_ui(int axisID, canMsg msg);
 
     /**
-     * @brief Parses resopnse to Get_ADC_Voltage message
+     * @brief Parses response to Get_ADC_Voltage message
      *
      * @param[in] axisID axis id to which the message corresponds
      * @param[in] msg recieved data
@@ -326,7 +339,7 @@ public:
     /**
      * @brief Calls ESTOP
      *
-     * @param[in] axisID axisID ID that corresponds to message's destination axis
+     * @param[in] axisID ID that corresponds to message's destination axis
      * @return int returns -1 at bus write failure, 0 at sucess
      */
     int call_estop(int axisID);
@@ -334,7 +347,7 @@ public:
     /**
      * @brief Gets active errors and disarm reason by calling get_error message
      *
-     * @param[in] axisID axisID ID that corresponds to message's destination axis
+     * @param[in] axisID ID that corresponds to message's destination axis
      * @return int returns -1 at bus write failure, 0 at sucess
      */
     int call_get_error(int axisID);
@@ -351,7 +364,7 @@ public:
     /**
      * @brief Sets axis state by calling set_axis_state message
      *
-     * @param[in] axisID axisID ID that corresponds to message's destination axis
+     * @param[in] axisID ID that corresponds to message's destination axis
      * @param[in] req_state corresponds to AxisState in odriveenums.h
      * @return int returns -1 at bus write failure, 0 at sucess
      */
@@ -360,7 +373,7 @@ public:
     /**
      * @brief Gets encoder position and velocity estimates by calling get_encoder_estimates message
      *
-     * @param[in] axisID axisID ID that corresponds to message's destination axis
+     * @param[in] axisID ID that corresponds to message's destination axis
      * @return int returns -1 at bus write failure, 0 at sucess
      */
     int call_get_encoder_estimates(int axisID);
@@ -368,7 +381,7 @@ public:
     /**
      * @brief Sets controller mode by calling set_controller_mode message
      *
-     * @param[in] axisID axisID ID that corresponds to message's destination axis
+     * @param[in] axisID ID that corresponds to message's destination axis
      * @param[in] control_mode corresponds to ControlMode in odriveenums.h
      * @param[in] input_mode corresponds to InputMode in odriveenums.h
      * @return int returns -1 at bus write failure, 0 at sucess
@@ -378,7 +391,7 @@ public:
     /**
      * @brief Sets input position parameters by calling set_input_pos message
      *
-     * @param[in] axisID axisID ID that corresponds to message's destination axis
+     * @param[in] axisID ID that corresponds to message's destination axis
      * @param[in] input_pos input position
      * @param[in] vel_ff velocity feed forward
      * @param[in] torque_ff torque feed forward
@@ -389,7 +402,7 @@ public:
     /**
      * @brief Sets input velocity parameters by calling set_input_vel message
      *
-     * @param[in] axisID axisID ID that corresponds to message's destination axis
+     * @param[in] axisID ID that corresponds to message's destination axis
      * @param[in] input_vel input velocity
      * @param[in] input_torque_ff input torque feed forward
      * @param[in] torque_ff torque feed forward
@@ -400,7 +413,7 @@ public:
     /**
      * @brief Sets input torque parameters by calling set_input_torque message
      *
-     * @param[in] axisID axisID ID that corresponds to message's destination axis
+     * @param[in] axisID ID that corresponds to message's destination axis
      * @param[in] torque input torque
      * @return int returns -1 at bus write failure, 0 at sucess
      */
@@ -409,63 +422,137 @@ public:
     /**
      * @brief Sets velocity and current limits by calling set_limits message
      *
-     * @param[in] axisID axisID ID that corresponds to message's destination axis
+     * @param[in] axisID ID that corresponds to message's destination axis
      * @param[in] velocity velocity limit
      * @param[in] current current limit
      * @return int returns -1 at bus write failure, 0 at sucess
      */
     int call_set_limits(int axisID, float velocity, float current);
 
+    /**
+     * @brief Calls start_anticogging message
+     *
+     * @param[in] axisID ID that corresponds to message's destination axis
+     * @return int returns -1 at bus write failure, 0 at sucess
+     */
     int call_start_anticogging(int axisID);
 
+    /**
+     * @brief Sets trajectory velocity limit by calling set_traj_vel_limit message
+     *
+     * @param[in] axisID ID that corresponds to message's destination axis
+     * @param[in] lim trajectory velocity limit
+     * @return int returns -1 at bus write failure, 0 at sucess
+     */
     int call_set_traj_vel_limit(int axisID, float lim);
 
+    /**
+     * @brief Sets trajectory acceleration and deceleration limits by calling set_traj_acel_limit message
+     *
+     * @param[in] axisID ID that corresponds to message's destination axis
+     * @param[in] accel trajectory acceleration limit
+     * @param[in] deccel trajectory deceleration limit
+     * @return int returns -1 at bus write failure, 0 at sucess
+     */
     int call_set_traj_accel_limits(int axisID, float accel, float decel);
 
+    /**
+     * @brief Sets trajectory inertia by calling set_traj_inertia message
+     *
+     * @param[in] axisID ID that corresponds to message's destination axis
+     * @param[in] inertia trajectory inertia
+     * @return int returns -1 at bus write failure, 0 at sucess
+     */
     int call_set_traj_inertia(int axisID, float inertia);
 
     /**
      * @brief Fetches commanded and measured motor currents by calling get_iq message
-     * 
-     * @param[in] axisID axisID ID that corresponds to message's destination axis
+     *
+     * @param[in] axisID ID that corresponds to message's destination axis
      * @return int returns -1 at bus write failure, 0 at sucess
      */
     int call_get_iq(int axisID);
 
     /**
      * @brief Fetches FET temperature by calling get_temperature message. Odrive does not respond with motor temperature
-     * 
-     * @param[in] axisID axisID ID that corresponds to message's destination axis
+     *
+     * @param[in] axisID ID that corresponds to message's destination axis
      * @return int returns -1 at bus write failure, 0 at sucess
      */
     int call_get_tempterature(int axisID); // OK  -returns FET temperature
 
     /**
      * @brief reboots odrive by calling reboot message
-     * 
-     * @param[in] axisID axisID ID that corresponds to message's destination axis
+     *
+     * @param[in] axisID ID that corresponds to message's destination axis
      * @return int returns -1 at bus write failure, 0 at sucess
      */
     int call_reboot(int axisID);
 
+    /**
+     * @brief Fetches bus current and voltage by calling get_bus_voltage_current message
+     *
+     * @param[in] axisID ID that corresponds to message's destination axis
+     * @return int returns -1 at bus write failure, 0 at sucess
+     */
     int call_get_bus_ui(int axisID); // OK - returns voltage
 
+    /**
+     * @brief Clears odrive errors by calling clear_errors message
+     *
+     * @param[in] axisID ID that corresponds to message's destination axis
+     * @return int returns -1 at bus write failure, 0 at sucess
+     */
     int call_clear_errors(int axisID);
 
+    /**
+     * @brief Sets absolute position reference inertia by calling set_absolute_position message
+     *
+     * @param[in] axisID ID that corresponds to message's destination axis
+     * @param[in] pos absolute position
+     * @return int returns -1 at bus write failure, 0 at sucess
+     */
     int call_set_absolute_position(int axisID, float pos);
 
+    /**
+     * @brief Sets position gain by calling set_pos_gain message
+     *
+     * @param[in] axisID ID that corresponds to message's destination axis
+     * @param[in] gain position gain
+     * @return int returns -1 at bus write failure, 0 at sucess
+     */
     int call_set_pos_gain(int axisID, float gain);
 
+    /**
+     * @brief Sets velocity gain and velocity integrator gain by calling set_vel_gains message
+     *
+     * @param[in] axisID ID that corresponds to message's destination axis
+     * @param[in] gain velocity gain
+     * @param[in] integrator velocity integrator gain
+     * @return int returns -1 at bus write failure, 0 at sucess
+     */
     int call_set_vel_gains(int axisID, float gain, float integrator);
 
+    /**
+     * @brief Fetches ADC voltage by calling get_adc_voltage message
+     *
+     * @param[in] axisID ID that corresponds to message's destination axis
+     * @return int returns -1 at bus write failure, 0 at sucess
+     */
     int call_get_adc_voltage(int axisID);
 
+    /**
+     * @brief Fetches controller error by calling get_controller_error message
+     *
+     * @param[in] axisID ID that corresponds to message's destination axis
+     * @return int returns -1 at bus write failure, 0 at sucess
+     */
     int call_get_controller_error(int axisID);
 
     /**
      * @brief sets odrive to software update mode by calling enter_dfu_mode message
-     * 
-     * @param[in] axisID axisID ID that corresponds to message's destination axis
+     *
+     * @param[in] axisID ID that corresponds to message's destination axis
      * @return int returns -1 at bus write failure, 0 at sucess
      */
     int call_enter_dfu_mode(int axisID);

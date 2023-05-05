@@ -1,5 +1,5 @@
 /**
- * @file OdriveEnums.h
+ * @file odriveenums.h
  * @author samuelsadok
  * @brief Odrive enums
  * @version 0.1
