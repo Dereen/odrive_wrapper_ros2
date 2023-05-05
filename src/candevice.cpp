@@ -5,7 +5,7 @@
  * @version 0.1
  * @date 2023-03-02
  * 
- * @copyright Copyright (c) 2023
+ # @copyright (c) JettyVision s.r.o in Prague 2023 - All Rights Reserved
  * 
  */
 #include "candevice.h"
@@ -40,7 +40,7 @@ int CanDevice::send(uint16_t id, uint16_t dlc, char * data, bool rtr)
 		return -1;
 	}
 
-	#ifndef DEBUG
+	#ifdef DEBUG
 	printf("-> 0x%03X [%d] ", f.can_id, f.can_dlc);
 
 	for (int i = 0; i < f.can_dlc; i++)
@@ -72,7 +72,7 @@ int CanDevice::send(uint16_t id, uint16_t dlc, bool rtr)
 		return -1;
 	}
 
-	#ifndef DEBUG
+	#ifdef DEBUG
 	printf("-> 0x%03X [%d] ", f.can_id, f.can_dlc);
 
 	for (int i = 0; i < f.can_dlc; i++)

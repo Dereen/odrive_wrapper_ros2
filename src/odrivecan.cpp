@@ -5,7 +5,7 @@
  * @version 0.1
  * @date 2023-03-03
  *
- * @copyright Copyright (c) 2023
+ # @copyright (c) JettyVision s.r.o in Prague 2023 - All Rights Reserved
  * see https://docs.odriverobotics.com/v/latest/can-protocol.html#transport-protocol
  */
 
@@ -64,19 +64,18 @@ void OdriveCan::init()
     // create unique pointers for each Odrive axis and init the instances of class Axis
     for (int i = 0; i < axes_num; i++)
     {
-        axes.push_back(std::make_shared<class OdriveAxis>(i));
         axes_ids[i] = i;
 
         // init circular buffer
-        input_buffer.push_back(std::make_unique<can_circ_buffer>(buffer_len));
+        input_buffer.push_back(make_unique<can_circ_buffer>(buffer_len));
     }
 
     // init update periods
-    periods = std::make_unique<struct updatePeriods>();
+    periods = make_unique<struct updatePeriods>();
     set_periods(100, 100);
 
     // init can listener
-    can_dev = std::make_unique<class CanDevice>();
+    can_dev = make_unique<class CanDevice>();
     can_dev->init_connection();
 
     std::cout << "[OdriveCan] start threads" << std::endl;
@@ -142,17 +141,16 @@ void OdriveCan::ask_for_current_values()
 
         for (auto &it : this->axes)
         {
-            id = it->get_axis_id();
             // std::cout << "ask for temp" << std::endl;
-            call_get_tempterature(id);
+            call_get_tempterature(it.id);
             /// std::cout << "ask for bus ui" << std::endl;
-            call_get_bus_ui(id);
+            call_get_bus_ui(it.id);
             // std::cout << "ask for encoder estimates" << std::endl;
-            call_get_encoder_estimates(id);
+            call_get_encoder_estimates(it.id);
             // std::cout << "ask for iq" << std::endl;
-            call_get_iq(id);
+            call_get_iq(it.id);
             //  std::cout << "ask for adc voltage" << std::endl;
-            call_get_adc_voltage(id);
+            call_get_adc_voltage(it.id);
         }
         usleep(periods->data*1000);
     }
@@ -168,9 +166,8 @@ void OdriveCan::get_errors()
 
         for (auto &it : this->axes)
         {
-            id = it->get_axis_id();
-            call_get_error(id);
-            call_get_controller_error(id);
+            call_get_error(it.id);
+            call_get_controller_error(it.id);
             
         }
         usleep(periods->axis_status*1000);
@@ -197,7 +194,7 @@ void OdriveCan::receive_msgs()
         msg = {frame, timestamp};
         if (!key_present(axes_ids, ax_id)) // key is not present in unordered map
         {
-            std::cout << "[ERROR] recieved message from unexpected axis ID " << get_axis_id() << std::endl;
+            std::cout << "[ERROR] recieved message from unexpected axis ID " << ax_id << std::endl;
             continue;
         }
         else
@@ -339,34 +336,53 @@ void OdriveCan::parse_version(int axisID, canMsg msg)
     uint8_t fw_min = uint8_t(msg.frame.data[5]);
     uint8_t fw_rev = uint8_t(msg.frame.data[6]);
 
-    axes[axisID]->set_axis_version(hw_maj, hw_min, hw_var, fw_maj, fw_min, fw_rev, msg.timestamp);
+    axes[axisID].ver.hw_version_major = hw_maj;
+    axes[axisID].ver.hw_version_minor = hw_min;
+    axes[axisID].ver.hw_version_variant = hw_var;
+    axes[axisID].ver.fw_version_major = fw_maj;
+    axes[axisID].ver.fw_version_minor = fw_min;
+    axes[axisID].ver.fw_version_revision = fw_rev;
+    axes[axisID].ver.timestamp = msg.timestamp;
 }
 
 void OdriveCan::parse_heartbeat(int axisID, canMsg msg)
 {
     uint32_t err = get32from8(msg.frame.data, 0, lsb);
-    axes[axisID]->set_axis_state(err, msg.frame.data[4], msg.frame.data[5], msg.frame.data[6], msg.timestamp);
+
+    axes[axisID].err.axis_error = err;
+    axes[axisID].err.timestamp = msg.timestamp;
+
+    axes[axisID].state.ax_state = msg.frame.data[4];
+    axes[axisID].state.procedure_result = msg.frame.data[5];
+    axes[axisID].state.trajectory_done_flag = msg.frame.data[6];
+    axes[axisID].state.timestamp = msg.timestamp;
 }
 
 void OdriveCan::parse_error(int axisID, canMsg msg)
 {
     uint32_t err = get32from8(msg.frame.data, 0, lsb);
     uint32_t reason = get32from8(msg.frame.data, 4, lsb);
-    axes[axisID]->update_error(err, reason, msg.timestamp);
+    axes[axisID].err.active_errors = err;
+    axes[axisID].err.disarm_reason = reason;
+    axes[axisID].err.timestamp = msg.timestamp;
 }
 
 void OdriveCan::parse_encoder_estimates(int axisID, canMsg msg)
 {
     float pos = get_float(get32from8(msg.frame.data, 0, lsb));
     float vel = get_float(get32from8(msg.frame.data, 4, lsb));
-    axes[axisID]->update_estimates(pos, vel, msg.timestamp);
+    axes[axisID].encoder.pos_estimate = pos;
+    axes[axisID].encoder.vel_estimate = vel;
+    axes[axisID].encoder.timestamp = msg.timestamp;
 }
 
 void OdriveCan::parse_iq(int axisID, canMsg msg)
 {
     float setpoint = get_float(get32from8(msg.frame.data, 0, lsb));
     float measured = get_float(get32from8(msg.frame.data, 4, lsb));
-    axes[axisID]->update_iq(setpoint, measured, msg.timestamp);
+    axes[axisID].iq.iq_measured = measured;
+    axes[axisID].iq.iq_setpoint = setpoint;
+    axes[axisID].iq.timestamp = msg.timestamp;
 }
 
 void OdriveCan::parse_temp(int axisID, canMsg msg)
@@ -376,36 +392,41 @@ void OdriveCan::parse_temp(int axisID, canMsg msg)
     // std::cout << std::endl;
     float fet = get_float(get32from8(msg.frame.data, 0, lsb));
     float motor = get_float(get32from8(msg.frame.data, 4, lsb));
-    axes[axisID]->update_temp(fet, motor, msg.timestamp);
+    axes[axisID].temp.fet_temperature = fet;
+    axes[axisID].temp.motor_temperature = motor;
+    axes[axisID].temp.timestamp = msg.timestamp;
 }
 
 void OdriveCan::parse_ui(int axisID, canMsg msg)
 {
     float voltage = get_float(get32from8(msg.frame.data, 0, lsb));
     float current = get_float(get32from8(msg.frame.data, 4, lsb));
-    axes[axisID]->update_ui(voltage, current, msg.timestamp);
+    axes[axisID].ui.bus_voltage = voltage;
+    axes[axisID].ui.bus_current = current;
+    axes[axisID].ui.timestamp = msg.timestamp;
 }
 
 void OdriveCan::parse_adc(int axisID, canMsg msg)
 {
-
     float voltage = get_float(get32from8(msg.frame.data, 0, lsb));
-    axes[axisID]->update_adc(voltage, msg.timestamp);
+    axes[axisID].adc.adc_voltage = voltage;
+    axes[axisID].adc.timestamp = msg.timestamp;
 }
 
 void OdriveCan::parse_controller_error(int axisID, canMsg msg)
 {
     uint32_t err = get32from8(msg.frame.data, 0, lsb);
-    axes[axisID]->update_controller_err(err, msg.timestamp);
+    axes[axisID].err.controller_error = err;
+    axes[axisID].err.timestamp = msg.timestamp;
 }
 
 
-std::ostream &operator<<(std::ostream &out, OdriveCan const *oc)
+std::ostream& operator<<(std::ostream &out, const OdriveCan& odrive)
 {
-    for (auto &it : oc->axes_ids)
+    for (auto &it : odrive.axes_ids)
     {
         out << "\n~~~~Axis ID " << it.first << " ~~~~" << std::endl;
-        out << oc->axes[it.second];
+        out << odrive.axes[it.second];
     }
 
     return out;
@@ -417,7 +438,7 @@ int OdriveCan::call_get_version(int axisID)
     if (key_present(axes_ids, axisID))
     {
         int msg_id = axisID << 5 | GET_VERSION; // axis ID + can msg name
-#ifndef DEBUG
+#ifdef DEBUG
         std::cout << "[GetVersion] Ask for version - CAN msg ID " << std::hex << msg_id << std::dec << std::endl;
 #endif
         send_mutex.lock();
@@ -455,7 +476,7 @@ int OdriveCan::call_estop(int axisID)
 
         struct timeval tv;
         gettimeofday(&tv, NULL);
-        this->axes[axes_ids[axisID]]->update_estop(tv);
+        this->axes[axes_ids[axisID]].estop = tv;
 
         return 0;
     }
@@ -543,7 +564,7 @@ int OdriveCan::call_set_axis_state(int axisID, uint32_t req_state)
             return ret;
         }
 
-        this->axes[axes_ids[axisID]]->update_axis_requested_state(req_state);
+        this->axes[axes_ids[axisID]].axis_requested_state = req_state;
         return 0;
     }
     else
@@ -580,7 +601,7 @@ int OdriveCan::call_set_controller_mode(int axisID, uint32_t control_mode, uint3
     {
         // construct can message
         int msg_id = axisID << 5 | SET_CONTROLLER_MODE; // axis ID + can msg name
-#ifndef DEBUG
+#ifdef DEBUG
         std::cout << "[SetControlerMode] Ask to set controller mode - CAN msg ID"
                   << std::hex << msg_id << std::dec << std::endl;
 #endif
@@ -596,11 +617,12 @@ int OdriveCan::call_set_controller_mode(int axisID, uint32_t control_mode, uint3
             return ret;
         }
 
-        this->axes[axes_ids[axisID]]->update_controller_mode(control_mode, input_mode);
+        this->axes[axes_ids[axisID]].reg.control_mode = control_mode;
+        this->axes[axes_ids[axisID]].reg.input_mode = input_mode;
 
         struct timeval tv;
         gettimeofday(&tv, NULL);
-        this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
+        this->axes[axes_ids[axisID]].reg.timestamp = tv;
         return 0;
     }
     else
@@ -628,10 +650,12 @@ int OdriveCan::call_set_input_pos(int axisID, float input_pos, float vel_ff, flo
             return ret;
         }
 
-        this->axes[axes_ids[axisID]]->update_input_pos(input_pos, vel_ff, torque_ff);
+        this->axes[axes_ids[axisID]].reg.input_pos = input_pos;
+        this->axes[axes_ids[axisID]].reg.vel_ff = vel_ff;
+        this->axes[axes_ids[axisID]].reg.torque_ff = torque_ff;
         struct timeval tv;
         gettimeofday(&tv, NULL);
-        this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
+        this->axes[axes_ids[axisID]].reg.timestamp = tv;
         return 0;
     }
     else
@@ -658,10 +682,12 @@ int OdriveCan::call_set_input_vel(int axisID, float input_vel, float input_torqu
             std::cerr << "[ERROR] on axis" << axisID << " - SET_INPUT_VEL. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         };
-        this->axes[axes_ids[axisID]]->update_input_vel(input_vel, input_torque_ff);
+
+        this->axes[axes_ids[axisID]].reg.input_vel = input_vel;
+        this->axes[axes_ids[axisID]].reg.input_torque_ff = input_torque_ff;
         struct timeval tv;
         gettimeofday(&tv, NULL);
-        this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
+        this->axes[axes_ids[axisID]].reg.timestamp = tv;
         return 0;
     }
     else
@@ -689,10 +715,10 @@ int OdriveCan::call_set_input_torque(int axisID, float torque)
             return ret;
         };
 
-        this->axes[axes_ids[axisID]]->update_input_torque(torque);
+        this->axes[axes_ids[axisID]].reg.input_torque = torque;
         struct timeval tv;
         gettimeofday(&tv, NULL);
-        this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
+        this->axes[axes_ids[axisID]].reg.timestamp = tv;
 
         return 0;
     }
@@ -721,10 +747,11 @@ int OdriveCan::call_set_limits(int axisID, float velocity, float current)
             return ret;
         };
 
-        this->axes[axes_ids[axisID]]->update_limits(velocity, current);
+        this->axes[axes_ids[axisID]].reg.velocity_limit = velocity;
+        this->axes[axes_ids[axisID]].reg.current_limit = current;
         struct timeval tv;
         gettimeofday(&tv, NULL);
-        this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
+        this->axes[axes_ids[axisID]].reg.timestamp = tv;
 
         return 0;
     }
@@ -752,8 +779,9 @@ int OdriveCan::call_start_anticogging(int axisID)
 
         struct timeval tv;
         gettimeofday(&tv, NULL);
-        this->axes[axes_ids[axisID]]->update_anticogging(tv);
-        this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
+
+        this->axes[axes_ids[axisID]].reg.anticogging_timestamp = tv;
+        this->axes[axes_ids[axisID]].reg.timestamp = tv;
 
         return 0;
     }
@@ -782,10 +810,10 @@ int OdriveCan::call_set_traj_vel_limit(int axisID, float lim)
             return ret;
         };
 
-        this->axes[axes_ids[axisID]]->update_traj_vel_limit(lim);
+        this->axes[axes_ids[axisID]].reg.traj_vel_limit = lim;
         struct timeval tv;
         gettimeofday(&tv, NULL);
-        this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
+        this->axes[axes_ids[axisID]].reg.timestamp = tv;
 
         return 0;
     }
@@ -814,10 +842,11 @@ int OdriveCan::call_set_traj_accel_limits(int axisID, float accel, float decel)
             return ret;
         };
 
-        this->axes[axes_ids[axisID]]->update_traj_accel_limit(accel, decel);
+        this->axes[axes_ids[axisID]].reg.traj_accel_limit = accel;
+        this->axes[axes_ids[axisID]].reg.traj_decel_limit = decel;
         struct timeval tv;
         gettimeofday(&tv, NULL);
-        this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
+        this->axes[axes_ids[axisID]].reg.timestamp = tv;
 
         return 0;
     }
@@ -846,10 +875,10 @@ int OdriveCan::call_set_traj_inertia(int axisID, float inertia)
             return ret;
         };
 
-        this->axes[axes_ids[axisID]]->update_traj_inertia(inertia);
+        this->axes[axes_ids[axisID]].reg.traj_inertia = inertia;
         struct timeval tv;
         gettimeofday(&tv, NULL);
-        this->axes[axes_ids[axisID]]->update_controller_timestamp(tv);
+        this->axes[axes_ids[axisID]].reg.timestamp = tv;
 
         return 0;
     }
@@ -925,7 +954,7 @@ int OdriveCan::call_reboot(int axisID)
 
         struct timeval tv;
         gettimeofday(&tv, NULL);
-        this->axes[axes_ids[axisID]]->update_reboot_timestamp(tv);
+        this->axes[axes_ids[axisID]].reboot_timestamp = tv;
 
         return 0;
     }
@@ -1000,12 +1029,12 @@ int OdriveCan::call_set_absolute_position(int axisID, float pos)
         send_mutex.unlock();
         if (ret < 0)
         {
-
             std::cerr << "[ERROR] on axis" << axisID << " - SET_ABSOLUTE_POSITION. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         };
 
-        this->axes[axes_ids[axisID]]->update_absolut_pos(pos);
+        this->axes[axes_ids[axisID]].position = pos;
+
         return 0;
     }
     else
@@ -1029,12 +1058,11 @@ int OdriveCan::call_set_pos_gain(int axisID, float gain)
         send_mutex.unlock();
         if (ret < 0)
         {
-
             std::cerr << "[ERROR] on axis" << axisID << " - SET_POS_GAIN. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         };
 
-        this->axes[axes_ids[axisID]]->update_pos_gain(gain);
+        this->axes[axes_ids[axisID]].gain.pos_gain = gain;
 
         return 0;
     }
@@ -1066,7 +1094,8 @@ int OdriveCan::call_set_vel_gains(int axisID, float gain, float integrator)
             return ret;
         };
 
-        this->axes[axes_ids[axisID]]->update_vel_gains(gain, integrator);
+        this->axes[axes_ids[axisID]].gain.vel_gain = gain;
+        this->axes[axes_ids[axisID]].gain.vel_integrator_gain = integrator;
 
         return 0;
     }
@@ -1147,3 +1176,7 @@ int OdriveCan::call_enter_dfu_mode(int axisID)
     else
         return 1;
 };
+
+const OdriveAxis& OdriveCan::operator[](int index) {
+    return axes[index];
+}

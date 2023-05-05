@@ -5,7 +5,7 @@
  * @version 0.1
  * @date 2023-03-02
  * 
- * @copyright Copyright (c) 2023
+ # @copyright (c) JettyVision s.r.o in Prague 2023 - All Rights Reserved
  * 
  */
 #pragma once

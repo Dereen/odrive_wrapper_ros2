@@ -5,7 +5,7 @@
  * @version 0.1
  * @date 2023-05-04
  *
- * @copyright Copyright (c) 2023
+ # @copyright (c) JettyVision s.r.o in Prague 2023 - All Rights Reserved
  * see https://docs.odriverobotics.com/v/latest/can-protocol.html#transport-protocol
  */
 
@@ -43,9 +43,8 @@ struct updatePeriods
  *       which can be easily misinterpreted as the response of Axis0 to get_version.
  *       Therefore, do not use the axis0, set axes_num = number of used axes + 1 and ignore data stored at axis0.
  */
-class OdriveCan : OdriveAxis
+class OdriveCan
 {
-    friend OdriveAxis;
     typedef struct
     {
         can_frame frame;
@@ -55,13 +54,13 @@ class OdriveCan : OdriveAxis
 public:
     std::unique_ptr<struct updatePeriods> periods; /*!< time constants in ms at which the periodically updated data will be fetched */
 
-    friend std::ostream &operator<<(std::ostream &out, OdriveCan const *oc); // function for nice data printing
+    friend std::ostream&operator<<(std::ostream &out, const OdriveCan& odrive); // function for nice data printing
 
 private:
     std::unordered_map<int, int> canMsgLen; /*!< Map data's part of CAN message length for individual messages */
 
     int axes_num;                                        /*!< Number of initialized axes */
-    std::vector<std::shared_ptr<class OdriveAxis>> axes; /*!< Array of initialized axes */
+    std::vector<OdriveAxis> axes; /*!< Array of initialized axes */
     std::unordered_map<int, int> axes_ids;               /*!< Maps axis ID to index in axes vector */
 
     int buffer_len; /*!< Buffer length for storing messages for each axis */
@@ -145,8 +144,6 @@ public:
             {
                 // create new instance
                 this->axes_ids[ax_ids[i]] = i;
-
-                this->axes[i]->set_axis_id(ax_ids[i]);
             }
         }
         else
@@ -469,4 +466,7 @@ public:
      * @return int returns -1 at bus write failure, 0 at sucess
      */
     int call_enter_dfu_mode(int axisID);
+
+    const OdriveAxis& operator[](int index);
+
 };
