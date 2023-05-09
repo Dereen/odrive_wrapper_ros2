@@ -30,7 +30,8 @@ struct OdriveCanParams
     boost::optional<int> axes_num;                   /*!< Number of initialized axes */
     boost::optional<std::vector<int>> axes_IDs;      /*!< Maps axis ID to index in axes vector */
     boost::optional<std::string> dev_name;           /*!< conencted device's system name, e.g. can0... */
-    boost::optional<bool> lsb;                       /*!<  defines is architecture is Least Significant Bit */
+    boost::optional<bool> lsb;                       /*!< defines if architecture is Least Significant Bit */
+    boost::optional<int> can_timeout_ms;             /*!< if message does not arrive within this timestamp, tcan interface is considered down*/
 };
 
 /**
@@ -88,6 +89,7 @@ private:
     bool lsb;                       /*!< defines is architecture is Least Significant Bit */
     uint32_t axis_status_update_ms; /*!<  error, state, done flag */
     uint32_t data_update_ms;        /*!<  bus UI, temperature, encoders ADC */
+    int      can_timeout_ms;        /*!< if message does not arrive within this timestamp, tcan interface is considered down*/
 
     enum
     {
@@ -123,12 +125,12 @@ private:
     void init();
 
 public:
-    OdriveCan(int axes_num = 6) : axes_num(axes_num), buffer_len(10), run(1), lsb(false), axis_status_update_ms(100), data_update_ms(100)
+    OdriveCan(int axes_num = 6) : axes_num(axes_num), buffer_len(10), run(1), lsb(false), axis_status_update_ms(100), data_update_ms(100),can_timeout_ms(250)
     {
         this->init();
     };
 
-    OdriveCan(struct OdriveCanParams param) : axes_num(8), buffer_len(10), run(1), lsb(false), axis_status_update_ms(100), data_update_ms(100)
+    OdriveCan(struct OdriveCanParams param) : axes_num(8), buffer_len(10), run(1), lsb(false), axis_status_update_ms(100), data_update_ms(100),can_timeout_ms(250)
     {
         if (param.axes_num != boost::none)
             this->axes_num = *param.axes_num;
@@ -142,7 +144,9 @@ public:
             this->dev_name = *param.dev_name;
         if (param.lsb != boost::none)
             this->lsb = *param.lsb;
-
+        if(param.can_timeout_ms != boost::none)
+            this->can_timeout_ms = *param.can_timeout_ms;
+            
         this->init();
 
         if ((param.axes_IDs != boost::none))
@@ -557,5 +561,7 @@ public:
     int call_enter_dfu_mode(int axisID);
 
     const OdriveAxis& operator[](int index);
+
+    bool is_ax_active(int axisID);
 
 };

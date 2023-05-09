@@ -52,7 +52,7 @@ struct OdriveAxis
     struct timeval estop {-1, -1};
 
     // can communication is active
-    struct timeval can_active{-1};
+    struct timeval can_active{-1, -1};
 
     friend std::ostream& operator<<(std::ostream &out, const OdriveAxis& odrive);
 };

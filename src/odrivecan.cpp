@@ -110,7 +110,6 @@ int OdriveCan::axis_from_header(uint32_t header)
     return id >> 5;
 }
 
-
 /**
  * @brief Sends CAN requests for temperature readings, encoder estimates, motor current, and ADC voltage
  *
@@ -135,7 +134,7 @@ void OdriveCan::ask_for_current_values()
             //  std::cout << "ask for adc voltage" << std::endl;
             call_get_adc_voltage(it.id);
         }
-        usleep(data_update_ms*1000);
+        usleep(data_update_ms * 1000);
     }
 }
 
@@ -151,9 +150,8 @@ void OdriveCan::get_errors()
         {
             call_get_error(it.id);
             call_get_controller_error(it.id);
-            
         }
-        usleep(axis_status_update_ms*1000);
+        usleep(axis_status_update_ms * 1000);
     }
 }
 
@@ -182,6 +180,7 @@ void OdriveCan::receive_msgs()
         }
         else
         {
+            axes[axes_ids[ax_id]].can_active = timestamp;
             buffer_mutex.lock();
             input_buffer[axes_ids[ax_id]]->push_back(msg);
             buffer_mutex.unlock();
@@ -205,7 +204,7 @@ void OdriveCan::process_msgs()
 
             // if buffer for given axis is not empty
             if (!input_buffer[it.second]->empty())
-            { 
+            {
 
                 buffer_mutex.lock();
                 msg = input_buffer[it.second]->front();
@@ -247,7 +246,7 @@ void OdriveCan::process_msgs()
                     parse_adc(it.first, msg);
                     break;
                 case GET_CONTROLLER_ERROR:
-                std::cout << "got response to controller error" << std::endl;
+                    std::cout << "got response to controller error" << std::endl;
                     parse_controller_error(it.first, msg);
                     break;
 
@@ -405,8 +404,7 @@ void OdriveCan::parse_controller_error(int axisID, canMsg msg)
     axes[axisID].err.timestamp = msg.timestamp;
 }
 
-
-std::ostream& operator<<(std::ostream &out, const OdriveCan& odrive)
+std::ostream &operator<<(std::ostream &out, const OdriveCan &odrive)
 {
     for (auto &it : odrive.axes_ids)
     {
@@ -416,7 +414,6 @@ std::ostream& operator<<(std::ostream &out, const OdriveCan& odrive)
 
     return out;
 }
-
 
 int OdriveCan::call_get_version(int axisID)
 {
@@ -1162,6 +1159,29 @@ int OdriveCan::call_enter_dfu_mode(int axisID)
         return 1;
 };
 
-const OdriveAxis& OdriveCan::operator[](int index) {
+const OdriveAxis &OdriveCan::operator[](int index)
+{
     return axes[index];
+}
+
+bool OdriveCan::is_ax_active(int axisID)
+{
+
+    if (key_present(axes_ids, axisID))
+    {
+        struct timeval now;
+        gettimeofday(&now, NULL);
+
+        struct timeval can_msg = axes[axes_ids[axisID]].can_active;
+
+        int seconds = now.tv_sec - can_msg.tv_sec;
+        int miliseconds = ((now.tv_usec - can_msg.tv_usec ) / 1000);
+
+        if ((seconds == 0) &&( miliseconds < this->can_timeout_ms))
+            return 1;
+        else if ((seconds == 1) && (60-miliseconds < this->can_timeout_ms)){
+            return 1;
+        }
+    }
+    return 0;
 }
