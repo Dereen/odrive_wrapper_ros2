@@ -74,7 +74,7 @@ private:
 
     std::unique_ptr<CanDevice> can_dev; /*!< Class for low level can operations */
 
-    bool run; /*!< Flag for finishing threads */
+    bool run;                /*!< Flag for finishing threads */
 
     std::mutex buffer_mutex; /*!< Mutex for reading messages from buffers */
     std::mutex send_mutex;   /*!< Mutex for sending messages */
@@ -84,9 +84,9 @@ private:
     std::thread th_send;    /*!< Thread for requesting periodic actuator readings */
     std::thread th_errors;  /*!< Thread for fetching errors */
 
-    std::string dev_name; /*!< conencted device's system name */
+    std::string dev_name;   /*!< conencted device's system name */
 
-    bool lsb;                       // defines is architecture is Least Significant Bit
+    bool lsb;                       /*!< defines is architecture is Least Significant Bit */
     uint32_t axis_status_update_ms; /*!<  error, state, done flag */
     uint32_t data_update_ms;        /*!<  bus UI, temperature, encoders ADC */
 
