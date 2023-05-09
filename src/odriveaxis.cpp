@@ -5,7 +5,7 @@
  * @version 0.1
  * @date 2023-03-21
  *
- * @copyright Copyright (c) 2023
+ # @copyright (c) JettyVision s.r.o in Prague 2023 - All Rights Reserved
  *
  */
 
@@ -69,327 +69,103 @@ std::map<uint8_t, std::string> axis_error_map = {
     {AXIS_ERROR_OVER_TEMP, "over temp"},
     {AXIS_ERROR_UNKNOWN_POSITION, "unknown position"}};
 
-void OdriveAxis::init()
-{
-    estop.tv_sec = -1;
-    reboot_timestamp.tv_sec = -1;
-
-    gain = std::make_unique<gains>();
-
-    ver = std::make_unique<axisVersion>();
-    ver->timestamp.tv_sec = -1;
-
-    err = std::make_unique<axisErrors>();
-    err->timestamp.tv_sec = -1;
-
-    state = std::make_unique<axisState>();
-    state->timestamp.tv_sec = -1;
-
-    iq = std::make_unique<iqStruct>();
-    iq->timestamp.tv_sec = -1;
-
-    temp = std::make_unique<tempStruct>();
-    temp->timestamp.tv_sec = -1;
-
-    ui = std::make_unique<busUI>();
-    ui->timestamp.tv_sec = -1;
-
-    encoder = std::make_unique<encoderStruct>();
-    encoder->timestamp.tv_sec = -1;
-
-    adc = std::make_unique<adcVoltage>();
-    adc->timestamp.tv_sec = -1;
-
-    reg = std::make_unique<axisRegSettings>();
-    reg->timestamp.tv_sec = -1;
-}
-
-bool OdriveAxis::axis_is_in_error(){
-    return (err->axis_error != AXIS_ERROR_NONE);
-}
-
-void OdriveAxis::set_axis_version(uint8_t hw_version_major, uint8_t hw_version_minor,
-                                  uint8_t hw_version_variant, uint8_t fw_version_major,
-                                  uint8_t fw_version_minor, uint8_t fw_version_revision,
-                                  struct timeval timestamp)
-{
-
-    this->ver->hw_version_major = hw_version_major;
-    this->ver->hw_version_minor = hw_version_minor;
-    this->ver->hw_version_variant = hw_version_variant;
-    this->ver->fw_version_major = fw_version_major;
-    this->ver->fw_version_minor = fw_version_minor;
-    this->ver->fw_version_revision = fw_version_revision;
-    this->ver->timestamp = timestamp;
-}
-
-void OdriveAxis::set_axis_state(uint8_t error, uint8_t state, uint8_t procedure_result,
-                                bool trajectory_done_flag, struct timeval timestamp)
-{
-    this->err->axis_error = error;
-    this->err->timestamp = timestamp;
-
-    this->state->ax_state = state;
-    this->state->trajectory_done_flag = trajectory_done_flag;
-    this->state->procedure_result = procedure_result;
-    this->state->timestamp = timestamp;
-}
-
-void OdriveAxis::update_error(uint32_t errors, uint32_t disarm_reason, struct timeval timestamp)
-{
-    this->err->active_errors = errors;
-    this->err->disarm_reason = disarm_reason;
-    this->err->timestamp = timestamp;
-}
-
-void OdriveAxis::update_estimates(float pos, float vel, struct timeval timestamp)
-{
-    this->encoder->pos_estimate = pos;
-    this->encoder->vel_estimate = vel;
-    this->encoder->timestamp = timestamp;
-}
-
-void OdriveAxis::update_iq(float setpoint, float measured, struct timeval timestamp)
-{
-    this->iq->iq_measured = measured;
-    this->iq->iq_setpoint = setpoint;
-    this->iq->timestamp = timestamp;
-}
-
-void OdriveAxis::update_temp(float fet, float motor, struct timeval timestamp)
-{
-    this->temp->fet_temperature = fet;
-    this->temp->motor_temperature = motor;
-    this->temp->timestamp = timestamp;
-}
-
-void OdriveAxis::update_ui(float voltage, float current, struct timeval timestamp)
-{
-    this->ui->bus_voltage = voltage;
-    this->ui->bus_current = current;
-    this->ui->timestamp = timestamp;
-}
-
-void OdriveAxis::update_adc(float voltage, struct timeval timestamp)
-{
-    this->adc->adc_voltage = voltage;
-    this->adc->timestamp = timestamp;
-}
-
-void OdriveAxis::update_controller_err(uint32_t error, struct timeval timestamp)
-{
-    this->err->controller_error = error;
-    this->err->timestamp = timestamp;
-}
-
 std::string italic(std::string s){
-    return "\e[3m" + s + "\e[0m";
+    return "\e[3m" + s +  "\e[0m";
 }
 
-std::ostream &operator<<(std::ostream &out, OdriveAxis const *ax)
+std::ostream& operator<<(std::ostream &out, const OdriveAxis& odrive)
 {
     // print Odrive version
-    if (ax->ver->timestamp.tv_sec > -1)
+    if (odrive.ver.timestamp.tv_sec > -1)
     {
-        out << "Odrive version [" << ax->ver->timestamp << "]:" << std::endl;
-        out << "\tHardware version " << unsigned(ax->ver->hw_version_major) << "."
-            << unsigned(ax->ver->hw_version_minor) << "." << (unsigned)ax->ver->hw_version_variant << std::endl;
-        out << "\tFirmware version " << unsigned(ax->ver->fw_version_major) << "."
-            << unsigned(ax->ver->fw_version_minor) << "." << (unsigned)ax->ver->fw_version_revision << std::endl;
+        out << "Odrive version [" << odrive.ver.timestamp << "]:" << std::endl;
+        out << "\tHardware version " << unsigned(odrive.ver.hw_version_major) << "."
+            << unsigned(odrive.ver.hw_version_minor) << "." << (unsigned)odrive.ver.hw_version_variant << std::endl;
+        out << "\tFirmware version " << unsigned(odrive.ver.fw_version_major) << "."
+            << unsigned(odrive.ver.fw_version_minor) << "." << (unsigned)odrive.ver.fw_version_revision << std::endl;
     }
     // print Axis state
      
-    if (ax->state->timestamp.tv_sec > -1)
+    if (odrive.state.timestamp.tv_sec > -1)
     {
-        out << "Axis status [" << ax->state->timestamp << "]:" << std::endl;
-        out << "\tAxis state: " << axis_state_map[(unsigned)ax->state->ax_state] << std::endl;
-        out << "\tProcedure result: " << (unsigned)ax->state->procedure_result << std::endl;
-        out << "\tTrajectory done: " << (ax->state->trajectory_done_flag ? "yes" : "no") << std::endl;
+        out << "Axis status [" << odrive.state.timestamp << "]:" << std::endl;
+        out << "\tAxis state: " << axis_state_map[(unsigned)odrive.state.ax_state] << std::endl;
+        out << "\tProcedure result: " << (unsigned)odrive.state.procedure_result << std::endl;
+        out << "\tTrajectory done: " << (odrive.state.trajectory_done_flag ? "yes" : "no") << std::endl;
 
-        if (ax->err->timestamp.tv_sec > -1)
+        if (odrive.err.timestamp.tv_sec > -1)
         {
-            out << "Errors [" << ax->err->timestamp << "]:\n";
-            out << "\tActive errors: " << odrive_error_map[ax->err->active_errors] << std::endl;
-            out << "\tDisarm reason: " << (unsigned)ax->err->disarm_reason << std::endl;
-            out << "\tAxis errors: " << axis_error_map[ax->err->axis_error] << std::endl;
-            out << "\tController error: " << (unsigned)ax->err->controller_error << std::endl;
+            out << "Errors [" << odrive.err.timestamp << "]:\n";
+            out << "\tActive errors: " << odrive_error_map[odrive.err.active_errors] << std::endl;
+            out << "\tDisarm reason: " << (unsigned)odrive.err.disarm_reason << std::endl;
+            out << "\tAxis errors: " << axis_error_map[odrive.err.axis_error] << std::endl;
+            out << "\tController error: " << (unsigned)odrive.err.controller_error << std::endl;
         }
     } else{
         out << "Axis status : CAN INTERFACE INACTIVE" << std::endl;
     }
 
     // print Encoder estimates
-    if (ax->encoder->timestamp.tv_sec > -1)
+    if (odrive.encoder.timestamp.tv_sec > -1)
     {
-        out << "Encoder estimates [" << ax->encoder->timestamp << "]:" << std::endl;
-        out << "\tPosition estimate: " << ax->encoder->pos_estimate << std::endl;
-        out << "\tVelocity estimate: " << ax->encoder->vel_estimate << std::endl;
+        out << "Encoder estimates [" << odrive.encoder.timestamp << "]:" << std::endl;
+        out << "\tPosition estimate: " << odrive.encoder.pos_estimate << std::endl;
+        out << "\tVelocity estimate: " << odrive.encoder.vel_estimate << std::endl;
     }
 
     // current temperature
-    if (ax->temp->timestamp.tv_sec > -1)
+    if (odrive.temp.timestamp.tv_sec > -1)
     {
-        out << "Temperature [" << ax->temp->timestamp << "]:" << std::endl;
-        out << "\tFET temperature: " << ax->temp->fet_temperature << std::endl;
-        out << "\tMotor temperature: " << ax->temp->motor_temperature << std::endl;
+        out << "Temperature [" << odrive.temp.timestamp << "]:" << std::endl;
+        out << "\tFET temperature: " << odrive.temp.fet_temperature << std::endl;
+        out << "\tMotor temperature: " << odrive.temp.motor_temperature << std::endl;
     }
 
     // current, voltage
-    if (ax->ui->timestamp.tv_sec > -1)
+    if (odrive.ui.timestamp.tv_sec > -1)
     {
-        out << "Bus voltage and current [" << ax->ui->timestamp << "]:" << std::endl;
-        out << "\tBus current: " << ax->ui->bus_current << std::endl;
-        out << "\tBus voltage: " << ax->ui->bus_voltage << std::endl;
+        out << "Bus voltage and current [" << odrive.ui.timestamp << "]:" << std::endl;
+        out << "\tBus current: " << odrive.ui.bus_current << std::endl;
+        out << "\tBus voltage: " << odrive.ui.bus_voltage << std::endl;
     }
 
-        if (ax->iq->timestamp.tv_sec > -1)
+    if (odrive.iq.timestamp.tv_sec > -1)
     {
-        out << "Motor current [" << ax->iq->timestamp << "]:" << std::endl;
-        out << "\tCommanded: " << ax->iq->iq_setpoint << std::endl;
-        out << "\tMeasured: " << ax->iq->iq_measured << std::endl;
+        out << "Motor current [" << odrive.iq.timestamp << "]:" << std::endl;
+        out << "\tCommanded: " << odrive.iq.iq_setpoint << std::endl;
+        out << "\tMeasured: " << odrive.iq.iq_measured << std::endl;
     }
 
     // ADC voltage
-    if (ax->adc->timestamp.tv_sec > -1)
-        out << "ADC voltage[" << ax->adc->timestamp << "]: " << ax->adc->adc_voltage << std::endl;
+    if (odrive.adc.timestamp.tv_sec > -1)
+        out << "ADC voltage[" << odrive.adc.timestamp << "]: " << odrive.adc.adc_voltage << std::endl;
 
     // Regulator settings
-    out << "Absolute position: " << ax->position << std::endl;
-    if (ax->reg->timestamp.tv_sec > -1)
+    out << "Absolute position: " << odrive.position << std::endl;
+    if (odrive.reg.timestamp.tv_sec > -1)
     {
-        out << "Regulator settings [" << ax->reg->timestamp << "]: " << std::endl;
-        out << "\tController mode: \t*"<< italic("Control mode: ") << control_mode_map[ax->reg->control_mode] << ", \t*"<< italic("Input mode: ")
-            << input_mode_map[ax->reg->input_mode] << std::endl;
-        out << "\tLimits: \t\t*" << italic("Velocity: ") << ax->reg->velocity_limit << ", \t*" << italic("Current: ")
-            << ax->reg->current_limit << std::endl;
-        out << "\tInput position: \t*" << italic("Position: ") << ax->reg->input_pos << ", \t*" << italic("Vel FF: ")
-            << ax->reg->vel_ff << " \t\t*" << italic("Torque FF: ") << ax->reg->torque_ff << std::endl;
-        out << "\tInput velocity: \t*" << italic("Input vel: ") << ax->reg->input_vel << ", \t*" << italic("Input torque FF: ")
-            << ax->reg->input_torque_ff << std::endl;
-        out << "\tTrajectory limits: \t*"<<italic("Velocity: ") << ax->reg->traj_vel_limit << ", \t*" << italic("Acceleration: ")
-            << ax->reg->traj_accel_limit << ", \t*" << italic("Deceleration: ") << ax->reg->traj_decel_limit << std::endl;
-        out << "\tTrajectory inertia: " << ax->reg->traj_inertia << std::endl;
-        out << "\tInput torque: " << ax->reg->input_torque << std::endl;
-        out << "\tAnticogging is " << (ax->reg->anticogging_timestamp.tv_sec > 0 ? "activated" : "deactivated") << std::endl;
+        out << "Regulator settings [" << odrive.reg.timestamp << "]: " << std::endl;
+        out << "\tController mode: \t*"<< italic("Control mode: ") << control_mode_map[odrive.reg.control_mode] << ", \t*"<< italic("Input mode: ")
+            << input_mode_map[odrive.reg.input_mode] << std::endl;
+        out << "\tLimits: \t\t*" << italic("Velocity: ") << odrive.reg.velocity_limit << ", \t*" << italic("Current: ")
+            << odrive.reg.current_limit << std::endl;
+        out << "\tInput position: \t*" << italic("Position: ") << odrive.reg.input_pos << ", \t*" << italic("Vel FF: ")
+            << odrive.reg.vel_ff << " \t\t*" << italic("Torque FF: ") << odrive.reg.torque_ff << std::endl;
+        out << "\tInput velocity: \t*" << italic("Input vel: ") << odrive.reg.input_vel << ", \t*" << italic("Input torque FF: ")
+            << odrive.reg.input_torque_ff << std::endl;
+        out << "\tTrajectory limits: \t*"<<italic("Velocity: ") << odrive.reg.traj_vel_limit << ", \t*" << italic("Acceleration: ")
+            << odrive.reg.traj_accel_limit << ", \t*" << italic("Deceleration: ") << odrive.reg.traj_decel_limit << std::endl;
+        out << "\tTrajectory inertia: " << odrive.reg.traj_inertia << std::endl;
+        out << "\tInput torque: " << odrive.reg.input_torque << std::endl;
+        out << "\tAnticogging is " << (odrive.reg.anticogging_timestamp.tv_sec > 0 ? "activated" : "deactivated") << std::endl;
     }
 
-    if (ax->estop.tv_sec > 0)
-        out << "Estop was called [" << ax->estop << "] " << std::endl;
+    if (odrive.estop.tv_sec > 0)
+        out << "Estop was called [" << odrive.estop << "] " << std::endl;
 
-    if (ax->reboot_timestamp.tv_sec > -1)
-        out << "Odrive was rebooted [" << ax->reboot_timestamp << "]" << std::endl;
+    if (odrive.reboot_timestamp.tv_sec > -1)
+        out << "Odrive was rebooted [" << odrive.reboot_timestamp << "]" << std::endl;
 
 
     return out;
-}
-
-void OdriveAxis::update_axis_requested_state(uint32_t state)
-{
-    this->axis_requested_state = state;
-};
-
-uint32_t OdriveAxis::get_axis_requested_state()
-{
-    return this->axis_requested_state;
-};
-
-void OdriveAxis::update_controller_mode(uint32_t control_mode, uint32_t input_mode)
-{
-    this->reg->control_mode = control_mode;
-    this->reg->input_mode = input_mode;
-};
-
-uint32_t OdriveAxis::get_controll_mode()
-{
-    return this->reg->control_mode;
-};
-
-uint32_t OdriveAxis::get_input_mode()
-{
-    return this->reg->input_mode;
-};
-
-void OdriveAxis::update_input_pos(float input_pos, float vel_ff, float torque_ff)
-{
-    this->reg->input_pos = input_pos;
-    this->reg->vel_ff = vel_ff;
-    this->reg->torque_ff = torque_ff;
-};
-
-void OdriveAxis::update_input_vel(float input_vel, float input_torque_ff)
-{
-    this->reg->input_vel = input_vel;
-    this->reg->input_torque_ff = input_torque_ff;
-}
-
-void OdriveAxis::update_input_torque(float input_torque)
-{
-    this->reg->input_torque = input_torque;
-}
-
-void OdriveAxis::update_limits(float velocity, float current)
-{
-    this->reg->velocity_limit = velocity;
-    this->reg->current_limit = current;
-}
-
-void OdriveAxis::update_traj_vel_limit(float lim)
-{
-    this->reg->traj_vel_limit = lim;
-}
-
-void OdriveAxis::update_traj_accel_limit(float accel, float decel)
-{
-    this->reg->traj_accel_limit = accel;
-    this->reg->traj_decel_limit = decel;
-}
-
-void OdriveAxis::update_traj_inertia(float inertia)
-{
-    this->reg->traj_inertia = inertia;
-}
-
-void OdriveAxis::update_absolut_pos(float pos)
-{
-    this->position = pos;
-}
-
-void OdriveAxis::update_pos_gain(float gain)
-{
-    this->gain->pos_gain = gain;
-}
-
-void OdriveAxis::update_vel_gains(float gain, float integrator_gain)
-{
-    this->gain->vel_gain = gain;
-    this->gain->vel_integrator_gain = integrator_gain;
-}
-
-void OdriveAxis::update_estop(struct timeval b)
-{
-    this->estop = b;
-}
-
-void OdriveAxis::update_anticogging(struct timeval b)
-{
-    this->reg->anticogging_timestamp = b;
-}
-
-void OdriveAxis::update_reboot_timestamp(struct timeval stamp)
-{
-    this->reboot_timestamp = stamp;
-}
-
-int OdriveAxis::get_axis_id()
-{
-    return this->id;
-}
-
-void OdriveAxis::set_axis_id(int id)
-{
-    this->id = id;
-}
-
-void OdriveAxis::update_controller_timestamp(struct timeval t){
-    this->reg->timestamp = t;
 }

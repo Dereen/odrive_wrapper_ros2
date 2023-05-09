@@ -4,3 +4,8 @@ obj/*
 .vscode/
 valgrind*
 odrive_settings.txt
+*.idea*
+*cmake-build-debug/*
+build/*
+html/*
+Doxyfile*

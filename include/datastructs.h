@@ -5,7 +5,7 @@
  * @version 0.1
  * @date 2023-04-19
  *
- * @copyright Copyright (c) 2023
+ # @copyright (c) JettyVision s.r.o in Prague 2023 - All Rights Reserved
  *
  */
 
@@ -19,17 +19,17 @@
  */
 typedef struct
 {
-    uint8_t hw_version_major;
-    uint8_t hw_version_minor;
+    uint8_t hw_version_major {0};
+    uint8_t hw_version_minor {0};
 
-    uint8_t hw_version_variant;
+    uint8_t hw_version_variant {0};
 
-    uint8_t fw_version_major;
-    uint8_t fw_version_minor;
+    uint8_t fw_version_major {0};
+    uint8_t fw_version_minor {0};
 
-    uint8_t fw_version_revision;
+    uint8_t fw_version_revision {0};
 
-    struct timeval timestamp;
+    struct timeval timestamp {-1, -1};
 
 } axisVersion;
 
@@ -39,11 +39,11 @@ typedef struct
  */
 typedef struct
 {
-    uint32_t axis_error;       // heartbeat
-    uint32_t disarm_reason;    // get_error
-    uint32_t active_errors;    // get_error
-    uint32_t controller_error; // Get_Controller_Error
-    struct timeval timestamp;
+    uint32_t axis_error {0};       // heartbeat
+    uint32_t disarm_reason {0};    // get_error
+    uint32_t active_errors {0};    // get_error
+    uint32_t controller_error {0}; // Get_Controller_Error
+    struct timeval timestamp {-1, -1};
 } axisErrors;
 
 /**
@@ -52,30 +52,30 @@ typedef struct
 typedef struct
 {
     // set_controller_mode
-    uint32_t control_mode;
-    uint32_t input_mode;
+    uint32_t control_mode {0};
+    uint32_t input_mode {0};
     // set_limits
-    uint32_t velocity_limit;
-    uint32_t current_limit;
-    struct timeval  anticogging_timestamp;
+    uint32_t velocity_limit {0};
+    uint32_t current_limit {0};
+    struct timeval  anticogging_timestamp {-1, -1};
     // set_input_pos
-    float input_pos;
-    float vel_ff;
-    float torque_ff;
+    float input_pos {0};
+    float vel_ff {0};
+    float torque_ff {0};
     // set_input_vel
-    float input_vel;
-    float input_torque_ff;
+    float input_vel {0};
+    float input_torque_ff {0};
     // set_input_torque
-    float input_torque;
+    float input_torque {0};
     // set_traj_vel_limit
-    float traj_vel_limit;
+    float traj_vel_limit {0};
     // set_traj_accel_limits
-    float traj_accel_limit;
-    float traj_decel_limit;
+    float traj_accel_limit {0};
+    float traj_decel_limit {0};
     // set_traj_inertia
-    float traj_inertia;
+    float traj_inertia {0};
 
-    struct timeval timestamp;
+    struct timeval timestamp {-1, -1};
 
 } axisRegSettings;
 
@@ -85,10 +85,10 @@ typedef struct
 typedef struct
 {
     // set_pos_gain
-    float pos_gain;
+    float pos_gain {0};
     // set_vel_gains
-    float vel_gain;
-    float vel_integrator_gain;
+    float vel_gain {0};
+    float vel_integrator_gain {0};
 } gains;
 
 /**
@@ -97,9 +97,9 @@ typedef struct
 typedef struct
 {
     // get_temperature
-    float fet_temperature;
-    float motor_temperature;
-    struct timeval timestamp;
+    float fet_temperature {0};
+    float motor_temperature {0};
+    struct timeval timestamp {0};
 } tempStruct;
 
 /**
@@ -108,9 +108,9 @@ typedef struct
 typedef struct
 {
     // Get_Encoder_Estimates
-    float pos_estimate;
-    float vel_estimate;
-    struct timeval timestamp;
+    float pos_estimate {0};
+    float vel_estimate {0};
+    struct timeval timestamp {-1, -1};
 } encoderStruct;
 
 /**
@@ -119,9 +119,9 @@ typedef struct
 typedef struct
 {
     // get_iq
-    float iq_setpoint;
-    float iq_measured;
-    struct timeval timestamp;
+    float iq_setpoint {0};
+    float iq_measured {0};
+    struct timeval timestamp {-1, -1};
 } iqStruct;
 
 /**
@@ -130,9 +130,9 @@ typedef struct
 typedef struct
 {
     // Get_Bus_Voltage_Current
-    float bus_voltage;
-    float bus_current;
-    struct timeval timestamp;
+    float bus_voltage {0};
+    float bus_current {0};
+    struct timeval timestamp {-1, -1};
 } busUI;
 
 /**
@@ -141,10 +141,10 @@ typedef struct
  */
 typedef struct
 {
-    uint8_t ax_state;
-    bool    trajectory_done_flag;
-    uint8_t procedure_result;
-    struct timeval timestamp;
+    uint8_t ax_state {0};
+    bool    trajectory_done_flag {false};
+    uint8_t procedure_result {0};
+    struct timeval timestamp {-1, -1};
 } axisState;
 
 /**
@@ -153,6 +153,6 @@ typedef struct
 typedef struct
 {
     // ADC voltage
-    float adc_voltage;
-    struct timeval timestamp;
+    float adc_voltage {0};
+    struct timeval timestamp {-1, -1};
 } adcVoltage;
