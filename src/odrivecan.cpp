@@ -3,7 +3,7 @@
  * @author Anna Zigajkova (zigajkova@jettyvision.cz)
  * @brief Class for Odrive S1 (PRO) CAN messages ID
  * @version 0.1
- * @date 2023-03-03
+ * @date 2023-05-09
  *
  # @copyright (c) JettyVision s.r.o in Prague 2023 - All Rights Reserved
  * see https://docs.odriverobotics.com/v/latest/can-protocol.html#transport-protocol
@@ -64,6 +64,10 @@ void OdriveCan::init()
     for (int i = 0; i < axes_num; i++)
     {
         axes_ids[i] = i;
+        OdriveAxis tmp;
+        axes.push_back(tmp);
+        axes[i].id = i;
+        std::cout << tmp << std::endl;
 
         // init circular buffer
         input_buffer.push_back(make_unique<can_circ_buffer>(buffer_len));
@@ -199,8 +203,10 @@ void OdriveCan::process_msgs()
         for (auto &it : this->axes_ids) // iterate over list of axis IDs and its corresponding buffers
         {                               // check buffer for each axis
 
+            // if buffer for given axis is not empty
             if (!input_buffer[it.second]->empty())
-            { // if buffer for given axis is not empty
+            { 
+
                 buffer_mutex.lock();
                 msg = input_buffer[it.second]->front();
                 input_buffer[it.second]->pop_front();

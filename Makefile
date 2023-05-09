@@ -8,7 +8,7 @@ INC_DIR  := include
 
 # tool macros
 CXX := g++
-CXXFLAGS := -I$(INC_DIR) -Wall -pthread -std=c++14
+CXXFLAGS := -I$(INC_DIR) -Wall -pthread -std=c++11
 DBGFLAGS := -g
 CCOBJFLAGS := $(CXXFLAGS) -c 
 

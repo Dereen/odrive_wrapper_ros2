@@ -3,7 +3,7 @@
  * @author Anna Zigajkova (zigajkova@jettyvision.cz)
  * @brief Class for Odrive S1 (PRO) CAN messages ID
  * @version 0.1
- * @date 2023-05-04
+ * @date 2023-05-09
  *
  # @copyright (c) JettyVision s.r.o in Prague 2023 - All Rights Reserved
  * see https://docs.odriverobotics.com/v/latest/can-protocol.html#transport-protocol
@@ -64,14 +64,14 @@ private:
     std::unordered_map<int, int> canMsgLen; /*!< Map data's part of CAN message length for individual messages */
 
     int axes_num;                                        /*!< Number of initialized axes */
-    std::vector<OdriveAxis> axes; /*!< Array of initialized axes */
+    std::vector<OdriveAxis> axes;                        /*!< Array of initialized axes */
     std::unordered_map<int, int> axes_ids;               /*!< Maps axis ID to index in axes vector */
 
-    int buffer_len; /*!< Buffer length for storing messages for each axis */
+    int buffer_len;                                      /*!< Buffer length for storing messages for each axis */
     typedef boost::circular_buffer<canMsg> can_circ_buffer;
     std::vector<std::unique_ptr<can_circ_buffer>> input_buffer; /*!<  A circular buffer for each axis info storage */
 
-    std::unique_ptr<CanDevice> can_dev; /*!< Class for low level can operations */
+    std::unique_ptr<CanDevice> can_dev;                  /*!< Class for low level can operations */
 
     bool run;                /*!< Flag for finishing threads */
 

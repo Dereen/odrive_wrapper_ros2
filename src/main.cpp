@@ -9,8 +9,7 @@ int main(int argc, char **argv)
 	printf("create can device\n");
 	OdriveCan odrive(2);
 
-
-	printf("Ask to get version\n");
+	sleep(1);
 	std::cout << odrive.call_set_axis_state(0, AXIS_STATE_CLOSED_LOOP_CONTROL);
 	std::cout << odrive.call_set_axis_state(1, AXIS_STATE_CLOSED_LOOP_CONTROL);
 	//odrive->call_start_anticogging(1);

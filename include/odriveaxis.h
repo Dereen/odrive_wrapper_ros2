@@ -3,7 +3,7 @@
  * @author Anna Zigajkova (zigajkova@jettyvision.cz)
  * @brief Structure for storing odrive settings info
  * @version 0.1
- * @date 2023-03-21
+ * @date 2023-05-09
  *
  # @copyright (c) JettyVision s.r.o in Prague 2023 - All Rights Reserved
  *
@@ -40,16 +40,19 @@ struct OdriveAxis
     axisRegSettings reg;   /*!< stores regulator settings*/
 
     // set_axis_state
-    uint32_t axis_requested_state;
+    uint32_t axis_requested_state {0};
 
     // set_absolute_position
-    float position;
+    float position {0.0f};
 
     // reboot
-    struct timeval reboot_timestamp;
+    struct timeval reboot_timestamp {-1, -1};
 
     // estop
-    struct timeval estop;
+    struct timeval estop {-1, -1};
+
+    // can communication is active
+    struct timeval can_active{-1};
 
     friend std::ostream& operator<<(std::ostream &out, const OdriveAxis& odrive);
 };

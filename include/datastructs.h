@@ -3,7 +3,7 @@
  * @author Anna Zigajkova (zigajkova@jettyvision.cz)
  * @brief Structures for storing odrive settings info
  * @version 0.1
- * @date 2023-04-19
+ * @date 2023-05-09
  *
  # @copyright (c) JettyVision s.r.o in Prague 2023 - All Rights Reserved
  *
@@ -99,7 +99,7 @@ typedef struct
     // get_temperature
     float fet_temperature {0};
     float motor_temperature {0};
-    struct timeval timestamp {0};
+    struct timeval timestamp {-1, -1};
 } tempStruct;
 
 /**
