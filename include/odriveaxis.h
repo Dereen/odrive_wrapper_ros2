@@ -10,6 +10,7 @@
  */
 
 #pragma once
+
 #include <stdint.h>
 #include <memory>
 #include <cstring>
@@ -23,10 +24,9 @@
  * @brief A struct for storing Odrive's simpleCAN mesasge data and communication via CAN interface
  *
  */
-struct OdriveAxis
-{
+struct OdriveAxis {
     // set_axis_node_id
-    int id {0}; /*!< Axis ID */
+    int id{0}; /*!< Axis ID */
 
     axisVersion ver;       /*!< stores version information */
     axisErrors err;        /*!< stores errors information */
@@ -40,19 +40,19 @@ struct OdriveAxis
     axisRegSettings reg;   /*!< stores regulator settings*/
 
     // set_axis_state
-    uint32_t axis_requested_state {0};
+    uint32_t axis_requested_state{0};
 
     // set_absolute_position
-    float position {0.0f};
+    float position{0.0f};
 
     // reboot
-    struct timeval reboot_timestamp {-1, -1};
+    struct timeval reboot_timestamp{-1, -1};
 
     // estop
-    struct timeval estop {-1, -1};
+    struct timeval estop{-1, -1};
 
     // can communication is active
     struct timeval can_active{-1, -1};
 
-    friend std::ostream& operator<<(std::ostream &out, const OdriveAxis& odrive);
+    friend std::ostream &operator<<(std::ostream &out, const OdriveAxis &odrive);
 };

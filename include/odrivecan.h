@@ -10,6 +10,7 @@
  */
 
 #pragma once
+
 #include <vector>
 #include <memory>
 #include <cstring>
@@ -22,8 +23,7 @@
 #include <mutex>
 #include <unordered_map>
 
-struct OdriveCanParams
-{
+struct OdriveCanParams {
     boost::optional<uint32_t> axis_status_update_ms; /*!<  error, state, done flag */
     boost::optional<uint32_t> data_update_ms;        /*!<  bus UI, temperature, encoders ADC */
     boost::optional<int> buffer_len;                 /*!< Buffer length for storing messages for each axis */
@@ -50,16 +50,14 @@ struct OdriveCanParams
  * Note: The simpleCAN protocol does not provide timestamps, so the OdriveAxis is filled by timestamp retrieved from socket when
  *       message is recieved
  */
-class OdriveCan
-{
-    typedef struct
-    {
+class OdriveCan {
+    typedef struct {
         can_frame frame;
         struct timeval timestamp;
     } canMsg;
 
 public:
-    friend std::ostream &operator<<(std::ostream &out, const OdriveCan& odrive); // function for nice data printing
+    friend std::ostream &operator<<(std::ostream &out, const OdriveCan &odrive); // function for nice data printing
 
 private:
     std::unordered_map<int, int> canMsgLen; /*!< Map data's part of CAN message length for individual messages */
@@ -89,10 +87,9 @@ private:
     bool lsb;                       /*!< defines is architecture is Least Significant Bit */
     uint32_t axis_status_update_ms; /*!<  error, state, done flag */
     uint32_t data_update_ms;        /*!<  bus UI, temperature, encoders ADC */
-    int      can_timeout_ms;        /*!< if message does not arrive within this timestamp, tcan interface is considered down*/
+    int can_timeout_ms;        /*!< if message does not arrive within this timestamp, tcan interface is considered down*/
 
-    enum
-    {
+    enum {
         GET_VERSION = 0x000,
         HEARTBEAT,
         ESTOP,
@@ -125,13 +122,11 @@ private:
     void init();
 
 public:
-    OdriveCan(int axes_num = 6) : axes_num(axes_num), buffer_len(10), run(1), lsb(false), axis_status_update_ms(100), data_update_ms(100),can_timeout_ms(250)
-    {
+    OdriveCan(int axes_num = 6) : axes_num(axes_num), buffer_len(10), run(1), lsb(false), axis_status_update_ms(100), data_update_ms(100), can_timeout_ms(250) {
         this->init();
     };
 
-    OdriveCan(struct OdriveCanParams param) : axes_num(8), buffer_len(10), run(1), lsb(false), axis_status_update_ms(100), data_update_ms(100),can_timeout_ms(250)
-    {
+    OdriveCan(struct OdriveCanParams param) : axes_num(8), buffer_len(10), run(1), lsb(false), axis_status_update_ms(100), data_update_ms(100), can_timeout_ms(250) {
         if (param.axes_num != boost::none)
             this->axes_num = *param.axes_num;
         if (param.axis_status_update_ms != boost::none)
@@ -144,35 +139,31 @@ public:
             this->dev_name = *param.dev_name;
         if (param.lsb != boost::none)
             this->lsb = *param.lsb;
-        if(param.can_timeout_ms != boost::none)
+        if (param.can_timeout_ms != boost::none)
             this->can_timeout_ms = *param.can_timeout_ms;
-            
+
         this->init();
 
-        if ((param.axes_IDs != boost::none))
-        {
+        if ((param.axes_IDs != boost::none)) {
             std::vector<int> arr = *param.axes_IDs;
-            if  (arr.size() == this->axes_ids.size()){
+            if (arr.size() == this->axes_ids.size()) {
                 // delete all map
                 this->axes_ids.clear();
 
-                for (int i = 0; i < axes_num; i++)
-                {
+                for (int i = 0; i < axes_num; i++) {
                     // create new instance
                     this->axes_ids[arr[i]] = i;
 
                     this->axes[i].id = arr[i];
                 }
-            }   else
-            {
+            } else {
                 std::cerr << "[ERROR] Got incorrect number of new ID's for the pre-allocated amount of axes" << std::endl;
             }
         }
     };
 
 
-    ~OdriveCan()
-    {
+    ~OdriveCan() {
         run = false;
         th_recieve.join();
         th_process.join();
@@ -560,7 +551,7 @@ public:
      */
     int call_enter_dfu_mode(int axisID);
 
-    const OdriveAxis& operator[](int index);
+    const OdriveAxis &operator[](int index);
 
     bool is_ax_active(int axisID);
 
