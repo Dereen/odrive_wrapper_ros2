@@ -27,7 +27,6 @@ struct OdriveCanParams {
     boost::optional<uint32_t> axis_status_update_ms; /*!<  error, state, done flag */
     boost::optional<uint32_t> data_update_ms;        /*!<  bus UI, temperature, encoders ADC */
     boost::optional<int> buffer_len;                 /*!< Buffer length for storing messages for each axis */
-    boost::optional<int> axes_num;                   /*!< Number of initialized axes */
     boost::optional<std::vector<int>> axes_IDs;      /*!< Maps axis ID to index in axes vector */
     boost::optional<std::string> dev_name;           /*!< conencted device's system name, e.g. can0... */
     boost::optional<bool> lsb;                       /*!< defines if architecture is Least Significant Bit */
@@ -58,36 +57,40 @@ class OdriveCan {
 
 public:
     friend std::ostream &operator<<(std::ostream &out, const OdriveCan &odrive); // function for nice data printing
+    const int axes_num{0};                                        /*!< Number of initialized axes */
 
 private:
-    std::unordered_map<int, int> canMsgLen; /*!< Map data's part of CAN message length for individual messages */
+    std::ostream* const output_stream{&std::cout}; /*!< output stream */
+    std::ostream* const error_stream{&std::cerr}; /*!< output stream */
 
-    int axes_num;                                        /*!< Number of initialized axes */
+    std::unordered_map<int, int> can_msg_len; /*!< Map data's part of CAN message length for individual messages */
+
     std::vector<OdriveAxis> axes;                        /*!< Array of initialized axes */
     std::unordered_map<int, int> axes_ids;               /*!< Maps axis ID to index in axes vector */
 
-    int buffer_len;                                      /*!< Buffer length for storing messages for each axis */
+    int buffer_len{10};                                      /*!< Buffer length for storing messages for each axis */
     typedef boost::circular_buffer<canMsg> can_circ_buffer;
     std::vector<std::unique_ptr<can_circ_buffer>> input_buffer; /*!<  A circular buffer for each axis info storage */
 
     std::unique_ptr<CanDevice> can_dev;                  /*!< Class for low level can operations */
 
-    bool run;                /*!< Flag for finishing threads */
+    bool run{true};                /*!< Flag for finishing threads */
 
     std::mutex buffer_mutex; /*!< Mutex for reading messages from buffers */
     std::mutex send_mutex;   /*!< Mutex for sending messages */
+    mutable std::mutex data_mutex;   /*!< Mutex for saving data to struct. Mutable for const index operator function */
 
     std::thread th_recieve; /*!< Thread that reads messages from CAN interface and stores them into buffers */
     std::thread th_process; /*!< Thread for processing messages from buffers */
     std::thread th_send;    /*!< Thread for requesting periodic actuator readings */
     std::thread th_errors;  /*!< Thread for fetching errors */
 
-    std::string dev_name;   /*!< conencted device's system name */
+    std::string dev_name;   /*!< connected device's system name */
 
-    bool lsb;                       /*!< defines is architecture is Least Significant Bit */
-    uint32_t axis_status_update_ms; /*!<  error, state, done flag */
-    uint32_t data_update_ms;        /*!<  bus UI, temperature, encoders ADC */
-    int can_timeout_ms;        /*!< if message does not arrive within this timestamp, tcan interface is considered down*/
+    bool lsb{false};                       /*!< defines is architecture is Least Significant Bit */
+    uint32_t axis_status_update_ms{100}; /*!<  error, state, done flag */
+    uint32_t data_update_ms{100};        /*!<  bus UI, temperature, encoders ADC */
+    int can_timeout_ms{250};        /*!< if message does not arrive within this timestamp, tcan interface is considered down*/
 
     enum {
         GET_VERSION = 0x000,
@@ -122,29 +125,31 @@ private:
     void init();
 
 public:
-    OdriveCan(int axes_num = 6) : axes_num(axes_num), buffer_len(10), run(1), lsb(false), axis_status_update_ms(100), data_update_ms(100), can_timeout_ms(250) {
-        this->init();
-    };
 
-    OdriveCan(struct OdriveCanParams param) : axes_num(8), buffer_len(10), run(1), lsb(false), axis_status_update_ms(100), data_update_ms(100), can_timeout_ms(250) {
-        if (param.axes_num != boost::none)
-            this->axes_num = *param.axes_num;
-        if (param.axis_status_update_ms != boost::none)
-            this->axis_status_update_ms = *param.axis_status_update_ms;
-        if (param.data_update_ms != boost::none)
-            this->data_update_ms = *param.data_update_ms;
-        if (param.buffer_len != boost::none)
-            this->buffer_len = *param.buffer_len;
-        if (param.dev_name != boost::none)
-            this->dev_name = *param.dev_name;
-        if (param.lsb != boost::none)
-            this->lsb = *param.lsb;
-        if (param.can_timeout_ms != boost::none)
-            this->can_timeout_ms = *param.can_timeout_ms;
+    OdriveCan(uint8_t axes_num) : axes_num(axes_num) { this->init(); }
+
+    OdriveCan(uint8_t axes_num, std::ostream* const out, std::ostream* const err) :
+    axes_num(axes_num),
+    output_stream(out),
+    error_stream(err) {
+        this->init();
+    }
+
+    OdriveCan(uint8_t axes_num, struct OdriveCanParams param) : OdriveCan(axes_num, param, &std::cout, &std::cerr) { }
+
+    OdriveCan(uint8_t axes_num, struct OdriveCanParams param, std::ostream* const out, std::ostream* const err) : axes_num(axes_num)
+    {
+        if (param.axis_status_update_ms != boost::none) this->axis_status_update_ms = *param.axis_status_update_ms;
+        if (param.data_update_ms != boost::none) this->data_update_ms = *param.data_update_ms;
+        if (param.buffer_len != boost::none) this->buffer_len = *param.buffer_len;
+        if (param.dev_name != boost::none) this->dev_name = *param.dev_name;
+        if (param.lsb != boost::none) this->lsb = *param.lsb;
+        if (param.can_timeout_ms != boost::none) this->can_timeout_ms = *param.can_timeout_ms;
 
         this->init();
 
         if ((param.axes_IDs != boost::none)) {
+
             std::vector<int> arr = *param.axes_IDs;
             if (arr.size() == this->axes_ids.size()) {
                 // delete all map
@@ -154,29 +159,31 @@ public:
                     // create new instance
                     this->axes_ids[arr[i]] = i;
 
-                    this->axes[i].id = arr[i];
+                    {
+                        std::lock_guard<std::mutex> guard(data_mutex);
+                        this->axes[i].id = arr[i];
+                    }
                 }
             } else {
-                std::cerr << "[ERROR] Got incorrect number of new ID's for the pre-allocated amount of axes" << std::endl;
+                (*error_stream) << "[ERROR] Got incorrect number of new ID's for the pre-allocated amount of axes" << std::endl;
             }
         }
     };
 
 
     ~OdriveCan() {
-        run = false;
-        th_recieve.join();
-        th_process.join();
-        th_send.join();
-        th_errors.join();
+        stop();
     };
 
     /**
-     * @brief Get the number of initalized axis containers
-     *
-     * @return int number of initialized axis data containers
-     */
-    int get_axes_num();
+    * @brief Starts threads and receiving
+    */
+    void start(void);
+
+    /**
+    * @brief Stops threads and receiving
+    */
+    void stop(void);
 
     /**
      * @brief Set the data update period
@@ -362,7 +369,7 @@ public:
      * @param[in] req_state corresponds to AxisState in odriveenums.h
      * @return int returns -1 at bus write failure, 0 at sucess
      */
-    int call_set_axis_state(int axisID, uint32_t req_state);
+    int call_set_axis_state(int axisID, AxisState req_state);
 
     /**
      * @brief Gets encoder position and velocity estimates by calling get_encoder_estimates message
@@ -380,7 +387,7 @@ public:
      * @param[in] input_mode corresponds to InputMode in odriveenums.h
      * @return int returns -1 at bus write failure, 0 at sucess
      */
-    int call_set_controller_mode(int axisID, uint32_t control_mode, uint32_t input_mode);
+    int call_set_controller_mode(int axisID, ControlMode control_mode, InputMode input_mode);
 
     /**
      * @brief Sets input position parameters by calling set_input_pos message
@@ -551,8 +558,24 @@ public:
      */
     int call_enter_dfu_mode(int axisID);
 
-    const OdriveAxis &operator[](int index);
+    /**
+     * @brief index access to odrive axis data
+     * @param index of selected axis
+     * @return const reference on axis data structure
+     */
+    OdriveAxis operator[](int index) const;
 
-    bool is_ax_active(int axisID);
+    /**
+     * @brief checks if data are valid
+     * @param axisID Id of selected axis
+     * @return true if data arent older than configured time
+     */
+    bool is_axis_active(int axisID);
 
+    /**
+    * @brief checks if can connection is active
+    * @param axisID Id of selected axis
+    * @return true if connection is open and active
+    */
+    bool is_connected();
 };

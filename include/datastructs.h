@@ -15,6 +15,8 @@
 #include <memory>
 #include <iostream>
 
+#include "odriveenums.h"
+
 /**
  * @brief Struct for containing information recieved in CAN AxisX_Get_Version
  */
@@ -29,7 +31,7 @@ typedef struct {
 
     uint8_t fw_version_revision{0};
 
-    struct timeval timestamp{-1, -1};
+    struct timeval timestamp{0, 0};
 
 } axisVersion;
 
@@ -38,11 +40,11 @@ typedef struct {
  * Concatenates responces from heartbeat, get_error and get_controller_error
  */
 typedef struct {
-    uint32_t axis_error{0};       // heartbeat
-    uint32_t disarm_reason{0};    // get_error
+    AxisError axis_error{AxisError::AXIS_ERROR_NONE};
+    MotorError disarm_reason{MotorError::MOTOR_ERROR_NONE};
     uint32_t active_errors{0};    // get_error
-    uint32_t controller_error{0}; // Get_Controller_Error
-    struct timeval timestamp{-1, -1};
+    ControllerError controller_error{ControllerError::CONTROLLER_ERROR_NONE}; // Get_Controller_Error
+    struct timeval timestamp{0, 0};
 } axisErrors;
 
 /**
@@ -50,12 +52,12 @@ typedef struct {
  */
 typedef struct {
     // set_controller_mode
-    uint32_t control_mode{0};
-    uint32_t input_mode{0};
+    ControlMode control_mode{ControlMode::CONTROL_MODE_UNKNOWN};
+    InputMode input_mode{InputMode::INPUT_MODE_INACTIVE};
     // set_limits
     uint32_t velocity_limit{0};
     uint32_t current_limit{0};
-    struct timeval anticogging_timestamp{-1, -1};
+
     // set_input_pos
     float input_pos{0};
     float vel_ff{0};
@@ -73,20 +75,16 @@ typedef struct {
     // set_traj_inertia
     float traj_inertia{0};
 
-    struct timeval timestamp{-1, -1};
-
-} axisRegSettings;
-
-/**
- * @brief Struct for containing information about gains
- */
-typedef struct {
     // set_pos_gain
     float pos_gain{0};
     // set_vel_gains
     float vel_gain{0};
     float vel_integrator_gain{0};
-} gains;
+
+    struct timeval anticogging_timestamp{0, 0};
+    struct timeval timestamp{0, 0};
+
+} axisRegSettings;
 
 /**
  * @brief Struct for containing information about temperature measurements
@@ -95,7 +93,7 @@ typedef struct {
     // get_temperature
     float fet_temperature{0};
     float motor_temperature{0};
-    struct timeval timestamp{-1, -1};
+    struct timeval timestamp{0, 0};
 } tempStruct;
 
 /**
@@ -105,17 +103,17 @@ typedef struct {
     // Get_Encoder_Estimates
     float pos_estimate{0};
     float vel_estimate{0};
-    struct timeval timestamp{-1, -1};
+    struct timeval timestamp{0, 0};
 } encoderStruct;
 
 /**
- * @brief Struct for containing information about iq values
+ * @brief Struct for containing information about motor current values
  */
 typedef struct {
     // get_iq
     float iq_setpoint{0};
     float iq_measured{0};
-    struct timeval timestamp{-1, -1};
+    struct timeval timestamp{0, 0};
 } iqStruct;
 
 /**
@@ -125,7 +123,7 @@ typedef struct {
     // Get_Bus_Voltage_Current
     float bus_voltage{0};
     float bus_current{0};
-    struct timeval timestamp{-1, -1};
+    struct timeval timestamp{0, 0};
 } busUI;
 
 /**
@@ -133,10 +131,10 @@ typedef struct {
  * stores information recieved in heartbeat message but the errors (see axisErrors)
  */
 typedef struct {
-    uint8_t ax_state{0};
+    AxisState axis_state {AxisState::AXIS_STATE_UNDEFINED};
     bool trajectory_done_flag{false};
     uint8_t procedure_result{0};
-    struct timeval timestamp{-1, -1};
+    struct timeval timestamp{0, 0};
 } axisState;
 
 /**
@@ -145,5 +143,5 @@ typedef struct {
 typedef struct {
     // ADC voltage
     float adc_voltage{0};
-    struct timeval timestamp{-1, -1};
+    struct timeval timestamp{0, 0};
 } adcVoltage;
