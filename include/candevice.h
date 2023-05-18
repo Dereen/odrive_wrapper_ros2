@@ -41,6 +41,9 @@ private:
 
     struct can_frame *frame; /*!< Reference to can_frame */
 
+    std::ostream* const output_stream{&std::cout}; /*!< output stream */
+    std::ostream* const error_stream{&std::cerr}; /*!< output stream */
+
 public:
     /**
      * @brief Inits connection with can device.
@@ -98,9 +101,22 @@ public:
      */
     int recieve(struct can_frame *frame, struct timeval *timestamp, int msg_num);
 
+    /**
+     * @brief Checks can connection
+     * @return true if can connection is open and active, otherwise false
+     */
+    bool is_connected(void);
+
     CanDevice() : dev_name("can0"), active(false) {};
 
     CanDevice(std::string name) : dev_name(name), active(false) {};
+
+    CanDevice(std::string name, std::ostream* const out, std::ostream* const err)
+    : dev_name(name),
+      active(false),
+      output_stream(out),
+      error_stream(err)
+      {};
 
     ~CanDevice() {
         if (this->active)
@@ -115,11 +131,10 @@ public:
 
 static inline std::ostream &operator<<(std::ostream &out, struct timeval const *time) {
     if (time->tv_sec > -1) {
-        time_t nowtime;
-        struct tm *nowtm;
+
         char tmbuf[64], buf[64];
 
-        nowtm = localtime(&time->tv_sec);
+        struct tm *nowtm = localtime(&time->tv_sec);
         strftime(tmbuf, sizeof tmbuf, "%Y-%m-%d %H:%M:%S", nowtm);
         snprintf(buf, sizeof buf, "%s.%06ld", tmbuf, time->tv_usec);
 
@@ -131,11 +146,9 @@ static inline std::ostream &operator<<(std::ostream &out, struct timeval const *
 
 static inline std::ostream &operator<<(std::ostream &out, struct timeval const &time) {
     if (time.tv_sec > -1) {
-        time_t nowtime;
-        struct tm *nowtm;
         char tmbuf[64], buf[64];
 
-        nowtm = localtime(&time.tv_sec);
+        struct tm *nowtm = localtime(&time.tv_sec);
         strftime(tmbuf, sizeof tmbuf, "%Y-%m-%d %H:%M:%S", nowtm);
         snprintf(buf, sizeof buf, "%s.%06ld", tmbuf, time.tv_usec);
 

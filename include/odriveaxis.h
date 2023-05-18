@@ -30,7 +30,6 @@ struct OdriveAxis {
 
     axisVersion ver;       /*!< stores version information */
     axisErrors err;        /*!< stores errors information */
-    gains gain;            /*!< stores gains*/
     tempStruct temp;       /*!< stores temperature measurements*/
     encoderStruct encoder; /*!< stores encoder estimates */
     iqStruct iq;           /*!< stores iq measurements*/
@@ -40,16 +39,16 @@ struct OdriveAxis {
     axisRegSettings reg;   /*!< stores regulator settings*/
 
     // set_axis_state
-    uint32_t axis_requested_state{0};
+    AxisState axis_requested_state{AxisState::AXIS_STATE_UNDEFINED};
 
     // set_absolute_position
-    float position{0.0f};
+    float position {0.0f};
 
     // reboot
-    struct timeval reboot_timestamp{-1, -1};
+    struct timeval reboot_timestamp{0, 0};
 
     // estop
-    struct timeval estop{-1, -1};
+    struct timeval estop {0, 0};
 
     // can communication is active
     struct timeval can_active{-1, -1};

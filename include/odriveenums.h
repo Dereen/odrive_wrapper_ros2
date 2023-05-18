@@ -51,6 +51,8 @@ enum Protocol {
     PROTOCOL_SIMPLE = 0x00000001,
 };
 
+static std::map<uint8_t, std::string> can_protocol_map = {{PROTOCOL_SIMPLE,                         "protocol simple"}};
+
 // ODrive.Axis.AxisState
 enum AxisState {
     AXIS_STATE_UNDEFINED = 0,
@@ -68,6 +70,20 @@ enum AxisState {
     AXIS_STATE_ENCODER_HALL_PHASE_CALIBRATION = 13,
 };
 
+static std::map<uint8_t, std::string> axis_state_map = {
+        {AXIS_STATE_UNDEFINED,                         "undefined"},
+        {AXIS_STATE_IDLE,                              "idle"},
+        {AXIS_STATE_STARTUP_SEQUENCE,                  "startup sequence"},
+        {AXIS_STATE_FULL_CALIBRATION_SEQUENCE,         "callibration sequence"},
+        {AXIS_STATE_MOTOR_CALIBRATION,                 "motor callibration"},
+        {AXIS_STATE_ENCODER_INDEX_SEARCH,              "encoder index search"},
+        {AXIS_STATE_ENCODER_OFFSET_CALIBRATION,        "encoder offset callibration"},
+        {AXIS_STATE_CLOSED_LOOP_CONTROL,               "closed loop control"},
+        {AXIS_STATE_LOCKIN_SPIN,                       "lockin spin"},
+        {AXIS_STATE_ENCODER_DIR_FIND,                  "encoder dir find"},
+        {AXIS_STATE_HOMING,                            "homing"},
+        {AXIS_STATE_ENCODER_HALL_POLARITY_CALIBRATION, "encoder polarity calibration"},
+        {AXIS_STATE_ENCODER_HALL_PHASE_CALIBRATION,    "encoder hall phase calibration"}};
 
 // ODrive.Encoder.Mode
 enum EncoderMode {
@@ -83,6 +99,7 @@ enum EncoderMode {
 
 // ODrive.Controller.ControlMode
 enum ControlMode {
+    CONTROL_MODE_UNKNOWN = -1,
     CONTROL_MODE_VOLTAGE_CONTROL = 0,
     CONTROL_MODE_TORQUE_CONTROL = 1,
     CONTROL_MODE_VELOCITY_CONTROL = 2,
@@ -177,6 +194,36 @@ enum MotorError {
     MOTOR_ERROR_UNBALANCED_PHASES = 0x800000000,
 };
 
+static std::map<long int, std::string> motor_error_map = {
+        {MOTOR_ERROR_NONE,                              "None"},
+        {MOTOR_ERROR_PHASE_RESISTANCE_OUT_OF_RANGE,     "Phase resistance out of range"},
+        {MOTOR_ERROR_PHASE_INDUCTANCE_OUT_OF_RANGE,     "Inductance out of range"},
+        {MOTOR_ERROR_DRV_FAULT,                         "Drv fault"},
+        {MOTOR_ERROR_CONTROL_DEADLINE_MISSED,           "Control deadline missed"},
+        {MOTOR_ERROR_MODULATION_MAGNITUDE,              "Modulation magnitude"},
+        {MOTOR_ERROR_CURRENT_SENSE_SATURATION,          "Current sense saturation"},
+        {MOTOR_ERROR_CURRENT_LIMIT_VIOLATION,           "Limit violation"},
+        {MOTOR_ERROR_MODULATION_IS_NAN,                 "Modulation is nan"},
+        {MOTOR_ERROR_MOTOR_THERMISTOR_OVER_TEMP,        "Motor thermistor over temp"},
+        {MOTOR_ERROR_FET_THERMISTOR_OVER_TEMP,          "Fet thermistor over temp"},
+        {MOTOR_ERROR_TIMER_UPDATE_MISSED,               "Timer update missed"},
+        {MOTOR_ERROR_CURRENT_MEASUREMENT_UNAVAILABLE,   "Current measurement unavailable"},
+        {MOTOR_ERROR_CONTROLLER_FAILED,                 "Controller failed"},
+        {MOTOR_ERROR_I_BUS_OUT_OF_RANGE,                "I bus out of range"},
+        {MOTOR_ERROR_BRAKE_RESISTOR_DISARMED,           "Brake resistor disarmed"},
+        {MOTOR_ERROR_SYSTEM_LEVEL,                      "System level"},
+        {MOTOR_ERROR_BAD_TIMING,                        "Bad timing"},
+        {MOTOR_ERROR_UNKNOWN_PHASE_ESTIMATE,            "Unknown phase estimate"},
+        {MOTOR_ERROR_UNKNOWN_PHASE_VEL,                 "Unknown phase vel"},
+        {MOTOR_ERROR_UNKNOWN_TORQUE,                    "Unknown torque"},
+        {MOTOR_ERROR_UNKNOWN_CURRENT_COMMAND,           "Unknown current command"},
+        {MOTOR_ERROR_UNKNOWN_CURRENT_MEASUREMENT,       "Unknown current measurement"},
+        {MOTOR_ERROR_UNKNOWN_VBUS_VOLTAGE,              "Unknown VBus voltage"},
+        {MOTOR_ERROR_UNKNOWN_VOLTAGE_COMMAND,           "Unknown voltage command"},
+        {MOTOR_ERROR_UNKNOWN_GAINS,                     "Unknown gains"},
+        {MOTOR_ERROR_CONTROLLER_INITIALIZING,           "Controller initializing"},
+        {MOTOR_ERROR_UNBALANCED_PHASES,                 "Unbalanced phases"}};
+
 // ODrive.Controller.Error
 enum ControllerError {
     CONTROLLER_ERROR_NONE = 0x00000000,
@@ -189,6 +236,17 @@ enum ControllerError {
     CONTROLLER_ERROR_INVALID_CIRCULAR_RANGE = 0x00000040,
     CONTROLLER_ERROR_SPINOUT_DETECTED = 0x00000080,
 };
+
+static std::map<long int, std::string> controller_error_map = {
+        {CONTROLLER_ERROR_NONE,                   "None"},
+        {CONTROLLER_ERROR_OVERSPEED,              "Overspeed"},
+        {CONTROLLER_ERROR_INVALID_INPUT_MODE,     "Invalid input mode"},
+        {CONTROLLER_ERROR_UNSTABLE_GAIN,          "Unstable gain"},
+        {CONTROLLER_ERROR_INVALID_MIRROR_AXIS,    "Invalid mirror axis"},
+        {CONTROLLER_ERROR_INVALID_LOAD_ENCODER,   "Invalid load encoder"},
+        {CONTROLLER_ERROR_INVALID_ESTIMATE,       "Invalid estimate"},
+        {CONTROLLER_ERROR_INVALID_CIRCULAR_RANGE, "Invalid circular range"},
+        {CONTROLLER_ERROR_SPINOUT_DETECTED,       "Spinout detected"}};
 
 // ODrive.Encoder.Error
 enum EncoderError {
@@ -211,5 +269,50 @@ enum SensorlessEstimatorError {
     SENSORLESS_ESTIMATOR_ERROR_UNSTABLE_GAIN = 0x00000001,
     SENSORLESS_ESTIMATOR_ERROR_UNKNOWN_CURRENT_MEASUREMENT = 0x00000002,
 };
+
+
+
+static std::map<uint8_t, std::string> control_mode_map = {
+        {CONTROL_MODE_VOLTAGE_CONTROL,  "voltage control"},
+        {CONTROL_MODE_TORQUE_CONTROL,   "torque control"},
+        {CONTROL_MODE_VELOCITY_CONTROL, "velocity control"},
+        {CONTROL_MODE_POSITION_CONTROL, "position control"}};
+
+static std::map<uint8_t, std::string> input_mode_map = {
+        {INPUT_MODE_INACTIVE,     "inactive"},
+        {INPUT_MODE_PASSTHROUGH,  "passthrough"},
+        {INPUT_MODE_VEL_RAMP,     "velocity ramp"},
+        {INPUT_MODE_POS_FILTER,   "position filter"},
+        {INPUT_MODE_MIX_CHANNELS, "mix channels"},
+        {INPUT_MODE_TRAP_TRAJ,    "trap trajectory"},
+        {INPUT_MODE_TORQUE_RAMP,  "torque ramp"},
+        {INPUT_MODE_MIRROR,       "mirror"},
+        {INPUT_MODE_TUNING,       "tuning"}};
+
+static std::map<int, std::string> odrive_error_map = {
+        {ODRIVE_ERROR_NONE,                      "none"},
+        {ODRIVE_ERROR_CONTROL_ITERATION_MISSED,  "control iteration missed"},
+        {ODRIVE_ERROR_DC_BUS_UNDER_VOLTAGE,      "DC bus undervoltage"},
+        {ODRIVE_ERROR_DC_BUS_OVER_VOLTAGE,       "DC bus overvoltage"},
+        {ODRIVE_ERROR_DC_BUS_OVER_REGEN_CURRENT, "DC bus over regen current"},
+        {ODRIVE_ERROR_DC_BUS_OVER_CURRENT,       "DC bus over current"},
+        {ODRIVE_ERROR_BRAKE_DEADTIME_VIOLATION,  "brake deadtime violation"},
+        {ODRIVE_ERROR_BRAKE_DUTY_CYCLE_NAN,      "breake duty cycle NaN"},
+        {ODRIVE_ERROR_INVALID_BRAKE_RESISTANCE,  "invalid brake resistance"}};
+
+static std::map<int, std::string> axis_error_map = {
+        {AXIS_ERROR_NONE,                        "none"},
+        {AXIS_ERROR_INVALID_STATE,               "invalid state"},
+        {AXIS_ERROR_MOTOR_FAILED,                "motor failed"},
+        {AXIS_ERROR_SENSORLESS_ESTIMATOR_FAILED, "sensorless estimator failed"},
+        {AXIS_ERROR_ENCODER_FAILED,              "encoder failed"},
+        {AXIS_ERROR_CONTROLLER_FAILED,           "controller failed"},
+        {AXIS_ERROR_WATCHDOG_TIMER_EXPIRED,      "watchdog timer expired"},
+        {AXIS_ERROR_MIN_ENDSTOP_PRESSED,         "min endstop pressed"},
+        {AXIS_ERROR_MAX_ENDSTOP_PRESSED,         "max endstop pressed"},
+        {AXIS_ERROR_ESTOP_REQUESTED,             "estop requested"},
+        {AXIS_ERROR_HOMING_WITHOUT_ENDSTOP,      "homing without endstop"},
+        {AXIS_ERROR_OVER_TEMP,                   "over temp"},
+        {AXIS_ERROR_UNKNOWN_POSITION,            "unknown position"}};
 
 #endif
