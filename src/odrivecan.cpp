@@ -558,7 +558,13 @@ int OdriveCan::call_set_input_pos(int axisID, float input_pos, float vel_ff, flo
 #endif
 
         char data[8];
-        get_char_from_nums<float>(data, input_pos, vel_ff, torque_ff, lsb);
+        if ((std::abs(vel_ff) > 65504)| (std::abs(torque_ff) > 65504)){
+            std::cerr << "The absolute value of vel_ff or torque_ff was too big (should be less than 65 504). The Set_input_position message will not be called" << std::endl;
+            return 1;
+            }
+
+
+        get_char_from_nums<float, ushort>(data, input_pos, float_to_half(vel_ff), float_to_half(torque_ff), lsb);
         send_mutex.lock();
         int ret = can_dev->send(msg_id, canMsgLen[SET_INPUT_POS], data);
         send_mutex.unlock();
@@ -568,8 +574,9 @@ int OdriveCan::call_set_input_pos(int axisID, float input_pos, float vel_ff, flo
         }
 
         this->axes[axes_ids[axisID]].reg.input_pos = input_pos;
-        this->axes[axes_ids[axisID]].reg.vel_ff = vel_ff;
-        this->axes[axes_ids[axisID]].reg.torque_ff = torque_ff;
+        this->axes[axes_ids[axisID]].reg.vel_ff = half_to_float(float_to_half(vel_ff));
+        this->axes[axes_ids[axisID]].reg.torque_ff = half_to_float(float_to_half(torque_ff));
+
         struct timeval tv;
         gettimeofday(&tv, NULL);
         this->axes[axes_ids[axisID]].reg.timestamp = tv;
