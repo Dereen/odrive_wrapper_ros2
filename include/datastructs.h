@@ -133,7 +133,7 @@ typedef struct {
 typedef struct {
     AxisState axis_state {AxisState::AXIS_STATE_UNDEFINED};
     bool trajectory_done_flag{false};
-    uint8_t procedure_result{0};
+    ProcedureResult procedure_result{ProcedureResult::SUCCESS};
     struct timeval timestamp{0, 0};
 } axisState;
 

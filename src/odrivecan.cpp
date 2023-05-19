@@ -81,6 +81,16 @@ void OdriveCan::start(void) {
 
     can_dev->init_connection();
 
+    // reset can timestamp
+    struct timeval timestamp;
+    gettimeofday(&timestamp, NULL);
+    {
+        std::lock_guard<std::mutex> guard(data_mutex);
+        for (int i = 0; i < axes_num; i++) {
+            axes[axes_ids[i]].can_active = timestamp;
+        }
+    }
+
     *output_stream << "[OdriveCan] start threads" << std::endl;
     th_recieve = std::thread(&OdriveCan::receive_msgs, this);
     th_process = std::thread(&OdriveCan::process_msgs, this);
@@ -179,7 +189,7 @@ void OdriveCan::receive_msgs() {
     struct can_frame frame;
 
     while (run) {
-        // read meessages
+        // read messages
         can_dev->recieve(&frame, &timestamp, 1);
         ax_id = axis_from_header(frame.can_id);
 
@@ -194,14 +204,13 @@ void OdriveCan::receive_msgs() {
                 std::lock_guard<std::mutex> guard(data_mutex);
                 axes[axes_ids[ax_id]].can_active = timestamp;
             }
-            {
+            if (!input_buffer[axes_ids[ax_id]]->full()) {
                 std::lock_guard<std::mutex> guard(buffer_mutex);
                 input_buffer[axes_ids[ax_id]]->push_back(msg);
+            } else {
+                *error_stream << "[ERROR] Circular buffer is full" << std::endl;
             }
         }
-
-        if (input_buffer[axes_ids[ax_id]]->full())
-            throw std::runtime_error("Circular buffer is full");
     }
 
     *output_stream << "[RECEIVE] End recieve thread" << std::endl;
@@ -257,63 +266,63 @@ void OdriveCan::process_msgs() {
                         parse_adc(it.first, msg);
                         break;
                     case GET_CONTROLLER_ERROR:
-                        //*output_stream << "got response to controller error" << std::endl;
+                        *output_stream << "got response to controller error" << std::endl;
                         parse_controller_error(it.first, msg);
                         break;
 
                     case SET_AXIS_NODE_ID:
-                        *error_stream << "Got unexpected response from set SET_AXIS_NODE_ID";
+                        *error_stream << "Got unexpected response from set SET_AXIS_NODE_ID" << std::endl;
                         break;
                     case SET_AXIS_STATE:
-                        *error_stream << "Got unexpected response from set SET_AXIS_STATE";
+                        *error_stream << "Got unexpected response from set SET_AXIS_STATE" << std::endl;
                         break;
                     case SET_CONTROLLER_MODE:
-                        *error_stream << "Got unexpected response from set SET_CONTROLLER_MODE";
+                        *error_stream << "Got unexpected response from set SET_CONTROLLER_MODE" << std::endl;
                         break;
                     case SET_INPUT_POS:
-                        *error_stream << "Got unexpected response from set SET_INPUT_POS";
+                        *error_stream << "Got unexpected response from set SET_INPUT_POS" << std::endl;
                         break;
                     case SET_INPUT_VEL:
-
+                        *error_stream << msg.frame.data << std::endl;
                         break;
                     case SET_INPUT_TORQUE:
-                        *error_stream << "Got unexpected response from set SET_INPUT_TORQUE";
+                        *error_stream << "Got unexpected response from set SET_INPUT_TORQUE" << std::endl;
                         break;
                     case SET_LIMITS:
-                        *error_stream << "Got unexpected response from set SET_LIMITS";
+                        *error_stream << "Got unexpected response from set SET_LIMITS" << std::endl;
                         break;
                     case START_ANTICOGGING:
-                        *error_stream << "Got unexpected response from set START_ANTICOGGING";
+                        *error_stream << "Got unexpected response from set START_ANTICOGGING" << std::endl;
                         break;
                     case SET_TRAJ_VEL_LIMIT:
-                        *error_stream << "Got unexpected response from set SET_TRAJ_VEL_LIMIT";
+                        *error_stream << "Got unexpected response from set SET_TRAJ_VEL_LIMIT" << std::endl;
                         break;
                     case SET_TRAJ_ACCEL_LIMITS:
-                        *error_stream << "Got unexpected response from set SET_TRAJ_ACCEL_LIMITS";
+                        *error_stream << "Got unexpected response from set SET_TRAJ_ACCEL_LIMITS" << std::endl;
                         break;
                     case SET_TRAJ_INERTIA:
-                        *error_stream << "Got unexpected response from set SET_TRAJ_INERTIA";
+                        *error_stream << "Got unexpected response from set SET_TRAJ_INERTIA" << std::endl;
                         break;
                     case REBOOT:
-                        *error_stream << "Got unexpected response from set REBOOT";
+                        *error_stream << "Got unexpected response from set REBOOT" << std::endl;
                         break;
                     case CLEAR_ERRORS:
-                        *error_stream << "Got unexpected response from set CLEAR_ERRORS";
+                        *error_stream << "Got unexpected response from set CLEAR_ERRORS" << std::endl;
                         break;
                     case SET_ABSOLUTE_POSITION:
-                        *error_stream << "Got unexpected response from set SET_ABSOLUTE_POSITION";
+                        *error_stream << "Got unexpected response from set SET_ABSOLUTE_POSITION" << std::endl;
                         break;
                     case SET_POS_GAIN:
-                        *error_stream << "Got unexpected response from set SET_POS_GAIN";
+                        *error_stream << "Got unexpected response from set SET_POS_GAIN" << std::endl;
                         break;
                     case SET_VEL_GAINS:
-                        *error_stream << "Got unexpected response from set SET_VEL_GAINS";
+                        *error_stream << "Got unexpected response from set SET_VEL_GAINS" << std::endl;
                         break;
                     case ENTER_DFU_MODE:
                         *error_stream << "Got unexpected response from set ENTER_DFU_MODE";
                         break;
                     default:
-                        *error_stream << "Unknown can message ID";
+                        *error_stream << "Unknown can message ID" << std::endl;
                         break;
                 }
             }
@@ -351,7 +360,7 @@ void OdriveCan::parse_heartbeat(int axisID, canMsg msg) {
         axes[axisID].err.timestamp = msg.timestamp;
 
         axes[axisID].state.axis_state = (AxisState)msg.frame.data[4];
-        axes[axisID].state.procedure_result = msg.frame.data[5];
+        axes[axisID].state.procedure_result = (ProcedureResult)msg.frame.data[5];
         axes[axisID].state.trajectory_done_flag = msg.frame.data[6];
         axes[axisID].state.timestamp = msg.timestamp;
     }
