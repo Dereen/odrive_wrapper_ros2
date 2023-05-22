@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include <iostream>
 #include <string.h>
+#include <cstring>
 
 int CanDevice::send(uint16_t id, uint16_t dlc, char *data, bool rtr) {
 
@@ -34,7 +35,7 @@ int CanDevice::send(uint16_t id, uint16_t dlc, char *data, bool rtr) {
     // write created can message
     int ret = write(s, &f, sizeof(struct can_frame));
     if (ret != sizeof(struct can_frame)) {
-        *error_stream << "[CanDev] Write error" << std::endl;
+        *error_stream << "[CanDev] Write error: " << std::strerror(errno) << std::endl;
         ///*output_stream << "wrote " << ret << "bytes\n";
         return -1;
     }
@@ -65,7 +66,7 @@ int CanDevice::send(uint16_t id, uint16_t dlc, bool rtr) {
     // write created can message
     int ret = write(s, &f, sizeof(struct can_frame));
     if (ret != sizeof(struct can_frame)) {
-        *error_stream << "[CanDev] Write error" << std::endl;
+        *error_stream << "[CanDev] Write error: " << std::strerror(errno) << std::endl;
         //*output_stream << "wrote " << ret << " bytes\n";
         return -1;
     }
@@ -98,7 +99,7 @@ int CanDevice::set_filter(uint16_t id, uint16_t mask) {
     nbytes = read(s, &frame, sizeof(struct can_frame));
 
     if (nbytes < 0) {
-        *error_stream << "[CanDev] Read error" << std::endl;
+        *error_stream << "[CanDev] Read error: " << std::strerror(errno) << std::endl;
         return 1;
     }
 
@@ -119,14 +120,14 @@ int CanDevice::recieve(struct can_frame *frame, struct timeval *timestamp, int m
     int nbytes = read(s, frame, sizeof(struct can_frame) * msg_num);
 
     if (nbytes < 0) { // nothing to read -> error, should at least get heartbeat
-        *output_stream << "Read error" << std::endl;
+        *output_stream << "Read error: " << std::strerror(errno) << std::endl;
         return 1;
     } else { // get timestamp
 
         int error = ioctl(s, SIOCGSTAMP, timestamp);
 
         if (error < 0) {
-            *error_stream << "[CanDev] Read error" << std::endl;
+            *error_stream << "[CanDev] Read error: " << std::strerror(errno) << std::endl;
             return 1;
         }
     }
@@ -147,10 +148,10 @@ int CanDevice::recieve(struct can_frame *frame, struct timeval *timestamp, int m
 }
 
 int CanDevice::init_connection() {
-    *output_stream << "[CanDev] Init connection" << std::endl;
+    *output_stream << "[CanDev] Init connection: " << std::strerror(errno) << std::endl;
 
     if ((this->s = socket(PF_CAN, SOCK_RAW, CAN_RAW)) < 0) {
-        *error_stream << "[CanDev] Socket error" << std::endl;
+        *error_stream << "[CanDev] Socket error: " << std::strerror(errno) << std::endl;
         return 1;
     }
 
@@ -167,7 +168,7 @@ int CanDevice::init_connection() {
 
     // open socket
     if (bind(this->s, (struct sockaddr *) &tmp, sizeof(tmp)) < 0) {
-        *error_stream << "Bind" << std::endl;
+        *error_stream << "[CanDev] Bind: " << std::strerror(errno) << std::endl;
         return 1;
     }
     this->active = true;
@@ -180,7 +181,7 @@ int CanDevice::init_connection() {
 int CanDevice::close_connection() {
     // close socket
     if (close(this->s) < 0) {
-        *error_stream << "Close" << std::endl;
+        *error_stream << "[CanDev] Close: " << std::strerror(errno) << std::endl;
         return 1;
     }
 

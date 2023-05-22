@@ -106,6 +106,12 @@ enum ControlMode {
     CONTROL_MODE_POSITION_CONTROL = 3,
 };
 
+static std::map<ControlMode, std::string> control_mode_map = {
+        {CONTROL_MODE_VOLTAGE_CONTROL,  "voltage control"},
+        {CONTROL_MODE_TORQUE_CONTROL,   "torque control"},
+        {CONTROL_MODE_VELOCITY_CONTROL, "velocity control"},
+        {CONTROL_MODE_POSITION_CONTROL, "position control"}};
+
 // ODrive.Controller.InputMode
 enum InputMode {
     INPUT_MODE_INACTIVE = 0,
@@ -118,6 +124,17 @@ enum InputMode {
     INPUT_MODE_MIRROR = 7,
     INPUT_MODE_TUNING = 8,
 };
+
+static std::map<InputMode, std::string> input_mode_map = {
+        {INPUT_MODE_INACTIVE,     "Inactive"},
+        {INPUT_MODE_PASSTHROUGH,  "Passthrough"},
+        {INPUT_MODE_VEL_RAMP,     "Velocity ramp"},
+        {INPUT_MODE_POS_FILTER,   "Position filter"},
+        {INPUT_MODE_MIX_CHANNELS, "Mix channels"},
+        {INPUT_MODE_TRAP_TRAJ,    "Trap trajectory"},
+        {INPUT_MODE_TORQUE_RAMP,  "Torque ramp"},
+        {INPUT_MODE_MIRROR,       "Mirror"},
+        {INPUT_MODE_TUNING,       "Tuning"}};
 
 // ODrive.Motor.MotorType
 enum MotorType {
@@ -139,11 +156,70 @@ enum ODriveError {
     ODRIVE_ERROR_INVALID_BRAKE_RESISTANCE = 0x00000080,
 };
 
+static std::map<int, std::string> odrive_error_map = {
+        {ODRIVE_ERROR_NONE,                      "none"},
+        {ODRIVE_ERROR_CONTROL_ITERATION_MISSED,  "control iteration missed"},
+        {ODRIVE_ERROR_DC_BUS_UNDER_VOLTAGE,      "DC bus undervoltage"},
+        {ODRIVE_ERROR_DC_BUS_OVER_VOLTAGE,       "DC bus overvoltage"},
+        {ODRIVE_ERROR_DC_BUS_OVER_REGEN_CURRENT, "DC bus over regen current"},
+        {ODRIVE_ERROR_DC_BUS_OVER_CURRENT,       "DC bus over current"},
+        {ODRIVE_ERROR_BRAKE_DEADTIME_VIOLATION,  "brake deadtime violation"},
+        {ODRIVE_ERROR_BRAKE_DUTY_CYCLE_NAN,      "breake duty cycle NaN"},
+        {ODRIVE_ERROR_INVALID_BRAKE_RESISTANCE,  "invalid brake resistance"}};
+
 // ODrive.Can.Error
 enum CanError {
     CAN_ERROR_NONE = 0x00000000,
     CAN_ERROR_DUPLICATE_CAN_IDS = 0x00000001,
 };
+
+enum DisarmReason {
+    NONE = 0x0,
+    INITIALIZING  = 0x1,
+    SYSTEM_LEVEL  = 0x2,
+    TIMING_ERROR  = 0x4,
+    MISSING_ESTIMATE  = 0x8,
+    BAD_CONFIG  = 0x10,
+    DRV_FAULT  = 0x20,
+    MISSING_INPUT  = 0x40,
+    DC_BUS_OVER_VOLTAGE  = 0x100,
+    DC_BUS_UNDER_VOLTAGE  = 0x200,
+    DC_BUS_OVER_CURRENT  = 0x400,
+    DC_BUS_OVER_REGEN_CURRENT  = 0x800,
+    CURRENT_LIMIT_VIOLATION  = 0x1000,
+    MOTOR_OVER_TEMP  = 0x2000,
+    INVERTER_OVER_TEMP  = 0x4000,
+    VELOCITY_LIMIT_VIOLATION  = 0x8000,
+    POSITION_LIMIT_VIOLATION  = 0x10000,
+    WATCHDOG_TIMER_EXPIRED  = 0x1000000,
+    ESTOP_REQUESTED  = 0x2000000,
+    SPINOUT_DETECTED  = 0x4000000,
+    OTHER_DEVICE_FAILED  = 0x8000000,
+    CALIBRATION_ERROR  = 0x40000000,
+};
+
+static std::map<DisarmReason, std::string> disarm_reason_map = {
+        {INITIALIZING,                              "Initializing"},
+        {SYSTEM_LEVEL,                              "System level"},
+        {TIMING_ERROR,                              "Timing error"},
+        {MISSING_ESTIMATE,                          "Missing estimate"},
+        {BAD_CONFIG,                                "Bad config"},
+        {DRV_FAULT,                                 "Drv fault"},
+        {MISSING_INPUT,                             "Missing input"},
+        {DC_BUS_OVER_VOLTAGE,                       "DC bus over voltage"},
+        {DC_BUS_UNDER_VOLTAGE,                      "DC bus under voltage"},
+        {DC_BUS_OVER_CURRENT,                       "DC bus over current"},
+        {DC_BUS_OVER_REGEN_CURRENT,                 "DC bus over regen current"},
+        {CURRENT_LIMIT_VIOLATION,                   "Current limit violation"},
+        {MOTOR_OVER_TEMP,                           "Motor over temp"},
+        {INVERTER_OVER_TEMP,                        "Inverter over temp"},
+        {VELOCITY_LIMIT_VIOLATION,                  "Velocity limit violation"},
+        {POSITION_LIMIT_VIOLATION,                  "Position limit violation"},
+        {WATCHDOG_TIMER_EXPIRED,                    "Watchdog timer expired"},
+        {ESTOP_REQUESTED,                           "Estop requested"},
+        {SPINOUT_DETECTED,                          "Spinout detected"},
+        {OTHER_DEVICE_FAILED,                       "Other device failed"},
+        {CALIBRATION_ERROR,                         "Calibration error"}};
 
 // ODrive.Axis.Error
 enum AxisError {
@@ -161,6 +237,21 @@ enum AxisError {
     AXIS_ERROR_OVER_TEMP = 0x00040000,
     AXIS_ERROR_UNKNOWN_POSITION = 0x00080000,
 };
+
+static std::map<AxisError, std::string> axis_error_map = {
+        {AXIS_ERROR_NONE,                        "None"},
+        {AXIS_ERROR_INVALID_STATE,               "Invalid state"},
+        {AXIS_ERROR_MOTOR_FAILED,                "Motor failed"},
+        {AXIS_ERROR_SENSORLESS_ESTIMATOR_FAILED, "Sensorless estimator failed"},
+        {AXIS_ERROR_ENCODER_FAILED,              "Encoder failed"},
+        {AXIS_ERROR_CONTROLLER_FAILED,           "Controller failed"},
+        {AXIS_ERROR_WATCHDOG_TIMER_EXPIRED,      "Watchdog timer expired"},
+        {AXIS_ERROR_MIN_ENDSTOP_PRESSED,         "Min endstop pressed"},
+        {AXIS_ERROR_MAX_ENDSTOP_PRESSED,         "Max endstop pressed"},
+        {AXIS_ERROR_ESTOP_REQUESTED,             "Estop requested"},
+        {AXIS_ERROR_HOMING_WITHOUT_ENDSTOP,      "Homing without endstop"},
+        {AXIS_ERROR_OVER_TEMP,                   "Over temp"},
+        {AXIS_ERROR_UNKNOWN_POSITION,            "Unknown position"}};
 
 // ODrive.Motor.Error
 enum MotorError {
@@ -194,7 +285,7 @@ enum MotorError {
     MOTOR_ERROR_UNBALANCED_PHASES = 0x800000000,
 };
 
-static std::map<long int, std::string> motor_error_map = {
+static std::map<MotorError, std::string> motor_error_map = {
         {MOTOR_ERROR_NONE,                              "None"},
         {MOTOR_ERROR_PHASE_RESISTANCE_OUT_OF_RANGE,     "Phase resistance out of range"},
         {MOTOR_ERROR_PHASE_INDUCTANCE_OUT_OF_RANGE,     "Inductance out of range"},
@@ -237,7 +328,7 @@ enum ControllerError {
     CONTROLLER_ERROR_SPINOUT_DETECTED = 0x00000080,
 };
 
-static std::map<long int, std::string> controller_error_map = {
+static std::map<ControllerError, std::string> controller_error_map = {
         {CONTROLLER_ERROR_NONE,                   "None"},
         {CONTROLLER_ERROR_OVERSPEED,              "Overspeed"},
         {CONTROLLER_ERROR_INVALID_INPUT_MODE,     "Invalid input mode"},
@@ -270,49 +361,40 @@ enum SensorlessEstimatorError {
     SENSORLESS_ESTIMATOR_ERROR_UNKNOWN_CURRENT_MEASUREMENT = 0x00000002,
 };
 
+enum ProcedureResult {
+    SUCCESS = 0x0,
+    BUSY = 0x1,
+    CANCELLED = 0x2,
+    DISARMED = 0x3,
+    NO_RESPONSE = 0x4,
+    POLE_PAIR_CPR_MISMATCH = 0x5,
+    PHASE_RESISTANCE_OUT_OF_RANGE = 0x6,
+    PHASE_INDUCTANCE_OUT_OF_RANGE = 0x7,
+    UNBALANCED_PHASES = 0x8,
+    INVALID_MOTOR_TYPE = 0x9,
+    ILLEGAL_HALL_STATE = 0xA,
+    TIMEOUT = 0xB,
+    HOMING_WITHOUT_ENDSTOP = 0xC,
+    INVALID_STATE = 0xD,
+    NOT_CALIBRATED = 0xE
+};
 
+static std::map<ProcedureResult, std::string> procedure_result_map = {
+        {SUCCESS,                           "Success"},
+        {BUSY,                              "Busy"},
+        {CANCELLED,                         "Cancelled"},
+        {DISARMED,                          "Disarmed"},
+        {NO_RESPONSE,                       "No response"},
+        {POLE_PAIR_CPR_MISMATCH,            "Pole pair cpr mismatch"},
+        {PHASE_RESISTANCE_OUT_OF_RANGE,     "Phase resistance out of range"},
+        {UNBALANCED_PHASES,                 "Unbalanced"},
+        {PHASE_INDUCTANCE_OUT_OF_RANGE,     "Phase inductance out of range"},
+        {INVALID_MOTOR_TYPE,                "Invalid motor type"},
+        {ILLEGAL_HALL_STATE,                "Illegal hall state"},
+        {TIMEOUT,                           "Timeout"},
+        {HOMING_WITHOUT_ENDSTOP,            "Homing without endstop"},
+        {INVALID_STATE,                     "Invalid state"},
+        {NOT_CALIBRATED,                    "Not calibrated"}};
 
-static std::map<uint8_t, std::string> control_mode_map = {
-        {CONTROL_MODE_VOLTAGE_CONTROL,  "voltage control"},
-        {CONTROL_MODE_TORQUE_CONTROL,   "torque control"},
-        {CONTROL_MODE_VELOCITY_CONTROL, "velocity control"},
-        {CONTROL_MODE_POSITION_CONTROL, "position control"}};
-
-static std::map<uint8_t, std::string> input_mode_map = {
-        {INPUT_MODE_INACTIVE,     "inactive"},
-        {INPUT_MODE_PASSTHROUGH,  "passthrough"},
-        {INPUT_MODE_VEL_RAMP,     "velocity ramp"},
-        {INPUT_MODE_POS_FILTER,   "position filter"},
-        {INPUT_MODE_MIX_CHANNELS, "mix channels"},
-        {INPUT_MODE_TRAP_TRAJ,    "trap trajectory"},
-        {INPUT_MODE_TORQUE_RAMP,  "torque ramp"},
-        {INPUT_MODE_MIRROR,       "mirror"},
-        {INPUT_MODE_TUNING,       "tuning"}};
-
-static std::map<int, std::string> odrive_error_map = {
-        {ODRIVE_ERROR_NONE,                      "none"},
-        {ODRIVE_ERROR_CONTROL_ITERATION_MISSED,  "control iteration missed"},
-        {ODRIVE_ERROR_DC_BUS_UNDER_VOLTAGE,      "DC bus undervoltage"},
-        {ODRIVE_ERROR_DC_BUS_OVER_VOLTAGE,       "DC bus overvoltage"},
-        {ODRIVE_ERROR_DC_BUS_OVER_REGEN_CURRENT, "DC bus over regen current"},
-        {ODRIVE_ERROR_DC_BUS_OVER_CURRENT,       "DC bus over current"},
-        {ODRIVE_ERROR_BRAKE_DEADTIME_VIOLATION,  "brake deadtime violation"},
-        {ODRIVE_ERROR_BRAKE_DUTY_CYCLE_NAN,      "breake duty cycle NaN"},
-        {ODRIVE_ERROR_INVALID_BRAKE_RESISTANCE,  "invalid brake resistance"}};
-
-static std::map<int, std::string> axis_error_map = {
-        {AXIS_ERROR_NONE,                        "none"},
-        {AXIS_ERROR_INVALID_STATE,               "invalid state"},
-        {AXIS_ERROR_MOTOR_FAILED,                "motor failed"},
-        {AXIS_ERROR_SENSORLESS_ESTIMATOR_FAILED, "sensorless estimator failed"},
-        {AXIS_ERROR_ENCODER_FAILED,              "encoder failed"},
-        {AXIS_ERROR_CONTROLLER_FAILED,           "controller failed"},
-        {AXIS_ERROR_WATCHDOG_TIMER_EXPIRED,      "watchdog timer expired"},
-        {AXIS_ERROR_MIN_ENDSTOP_PRESSED,         "min endstop pressed"},
-        {AXIS_ERROR_MAX_ENDSTOP_PRESSED,         "max endstop pressed"},
-        {AXIS_ERROR_ESTOP_REQUESTED,             "estop requested"},
-        {AXIS_ERROR_HOMING_WITHOUT_ENDSTOP,      "homing without endstop"},
-        {AXIS_ERROR_OVER_TEMP,                   "over temp"},
-        {AXIS_ERROR_UNKNOWN_POSITION,            "unknown position"}};
 
 #endif
