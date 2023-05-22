@@ -41,7 +41,7 @@ typedef struct {
  */
 typedef struct {
     AxisError axis_error{AxisError::AXIS_ERROR_NONE};
-    MotorError disarm_reason{MotorError::MOTOR_ERROR_NONE};
+    DisarmReason disarm_reason{DisarmReason::NONE};
     uint32_t active_errors{0};    // get_error
     ControllerError controller_error{ControllerError::CONTROLLER_ERROR_NONE}; // Get_Controller_Error
     struct timeval timestamp{0, 0};

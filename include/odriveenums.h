@@ -174,6 +174,7 @@ enum CanError {
 };
 
 enum DisarmReason {
+    NONE = 0x0,
     INITIALIZING  = 0x1,
     SYSTEM_LEVEL  = 0x2,
     TIMING_ERROR  = 0x4,

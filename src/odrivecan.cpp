@@ -245,7 +245,7 @@ void OdriveCan::process_msgs() {
                         parse_heartbeat(it.first, msg);
                         break;
                     case ESTOP:
-                        *error_stream << "Got unexpected response from set ESTOP";
+                        //*error_stream << "Got unexpected response from set ESTOP";
                         break;
                     case GET_ERROR:
                         parse_error(it.first, msg);
@@ -372,7 +372,7 @@ void OdriveCan::parse_error(int axisID, canMsg msg) {
     {
         std::lock_guard<std::mutex> guard(data_mutex);
         axes[axisID].err.active_errors = err;
-        axes[axisID].err.disarm_reason = (MotorError) reason;
+        axes[axisID].err.disarm_reason = (DisarmReason) reason;
         axes[axisID].err.timestamp = msg.timestamp;
     }
 }
