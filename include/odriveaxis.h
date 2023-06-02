@@ -35,7 +35,7 @@ struct OdriveAxis {
     iqStruct iq;           /*!< stores iq measurements*/
     busUI ui;              /*!< stores bus's voltage and current measurements*/
     axisState state;       /*!< stores axis state*/
-    adcVoltage adc;        /*!< stores ADC voltage measurements*/
+    torqueStruct torque;   /*!< stores Torque measurements*/
     axisRegSettings reg;   /*!< stores regulator settings*/
 
     // set_axis_state

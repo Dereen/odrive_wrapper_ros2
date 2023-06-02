@@ -54,7 +54,7 @@ void OdriveCan::init() {
                  {SET_ABSOLUTE_POSITION,   4},
                  {SET_POS_GAIN,            4},
                  {SET_VEL_GAINS,           8},
-                 {GET_ADC_VOLTAGE,         4},
+                 {GET_TORQUE,              8},
                  {GET_CONTROLLER_ERROR,    4},
                  {ENTER_DFU_MODE,          0}};
 
@@ -150,6 +150,7 @@ void OdriveCan::ask_for_current_values() {
             call_get_bus_ui(id);
             // *output_stream << "ask for encoder estimates" << std::endl;
             //call_get_encoder_estimates(id);
+            call_get_torque(id);
             // *output_stream << "ask for iq" << std::endl;
             call_get_iq(id);
             //  *output_stream << "ask for adc voltage" << std::endl;
@@ -262,8 +263,8 @@ void OdriveCan::process_msgs() {
                     case GET_BUS_VOLTAGE_CURRENT:
                         parse_ui(it.first, msg);
                         break;
-                    case GET_ADC_VOLTAGE:
-                        parse_adc(it.first, msg);
+                    case GET_TORQUE:
+                        parse_torque(it.first, msg);
                         break;
                     case GET_CONTROLLER_ERROR:
                         *output_stream << "got response to controller error" << std::endl;
@@ -421,12 +422,14 @@ void OdriveCan::parse_ui(int axisID, canMsg msg) {
     }
 }
 
-void OdriveCan::parse_adc(int axisID, canMsg msg) {
-    float voltage = get_float(get32from8(msg.frame.data, 0, lsb));
+void OdriveCan::parse_torque(int axisID, canMsg msg) {
+    float setpoint = get_float(get32from8(msg.frame.data, 0, lsb));
+    float estimate = get_float(get32from8(msg.frame.data, 4, lsb));
     {
         std::lock_guard<std::mutex> guard(data_mutex);
-        axes[axisID].adc.adc_voltage = voltage;
-        axes[axisID].adc.timestamp = msg.timestamp;
+        axes[axisID].torque.torque_setpoint = setpoint;
+        axes[axisID].torque.torque_estimate = estimate;
+        axes[axisID].torque.timestamp = msg.timestamp;
     }
 }
 
@@ -1161,9 +1164,9 @@ int OdriveCan::call_set_vel_gains(int axisID, float gain, float integrator) {
         return 1;
 }
 
-int OdriveCan::call_get_adc_voltage(int axisID) {
+int OdriveCan::call_get_torque(int axisID) {
     if (key_present(axes_ids, axisID)) {
-        int msg_id = (axisID * 0x20) + GET_ADC_VOLTAGE; // axis ID + can msg name
+        int msg_id = (axisID * 0x20) + GET_TORQUE; // axis ID + can msg name
 #ifdef DEBUG
         *output_stream << "[GetADC] Ask for ADC voltage - CAN msg ID " << std::hex << msg_id << std::dec << std::endl;
 #endif
@@ -1171,11 +1174,11 @@ int OdriveCan::call_get_adc_voltage(int axisID) {
 
         {
             std::lock_guard<std::mutex> guard(send_mutex);
-            ret = can_dev->send(msg_id, can_msg_len[GET_ADC_VOLTAGE], true);
+            ret = can_dev->send(msg_id, can_msg_len[GET_TORQUE], true);
         }
         if (ret < 0) {
 
-            *error_stream << "[ERROR] on axis" << axisID << " - GET_ADC_VOLTAGE. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - GET_TORQUE. The wrong number of bytes were written to CAN" << std::endl;
             return ret;
         }
 

@@ -97,6 +97,16 @@ typedef struct {
 } tempStruct;
 
 /**
+ * @brief Struct for containing information about torque regulation and estimates
+ */
+typedef struct {
+    // get_torque
+    float torque_setpoint{0};
+    float torque_estimate{0};
+    struct timeval timestamp{0, 0};
+} torqueStruct;
+
+/**
  * @brief Struct for containing information about encoder estimates
  */
 typedef struct {

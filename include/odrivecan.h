@@ -117,12 +117,12 @@ private:
         SET_ABSOLUTE_POSITION = 0x019,
         SET_POS_GAIN = 0x01a,
         SET_VEL_GAINS = 0x01b,
-        GET_ADC_VOLTAGE = 0x01c,
+        GET_TORQUE = 0x01c,
         GET_CONTROLLER_ERROR = 0x01d,
         ENTER_DFU_MODE = 0x01f
     };
 
-    void init();
+    void init(void);
 
 public:
 
@@ -236,25 +236,25 @@ public:
      * @brief Gets the errors. calls Get_Error and Get_Controller_Error periodically
      *
      */
-    void get_errors();
+    void get_errors(void);
 
     /**
      * @brief Periodiaclly asks for temperature readings, encoder estimation, bus UI, motor current, ADC voltage
      *
      */
-    void ask_for_current_values();
+    void ask_for_current_values(void);
 
     /**
      * @brief recieves can messages and stores them in circluar buffers for each axis
      *
      */
-    void receive_msgs();
+    void receive_msgs(void);
 
     /**
      * @brief processes can messages from circluar buffers for each axis
      *
      */
-    void process_msgs();
+    void process_msgs(void);
 
     /**
      * @brief Parses response to Get_Version message
@@ -321,12 +321,12 @@ public:
     void parse_ui(int axisID, canMsg msg);
 
     /**
-     * @brief Parses response to Get_ADC_Voltage message
+     * @brief Parses response to Get_torque message
      *
      * @param[in] axisID axis id to which the message corresponds
      * @param[in] msg recieved data
      */
-    void parse_adc(int axisID, canMsg msg);
+    void parse_torque(int axisID, canMsg msg);
 
     // USER called functions ---------------------------------------------------------
     /**
@@ -535,12 +535,12 @@ public:
     int call_set_vel_gains(int axisID, float gain, float integrator);
 
     /**
-     * @brief Fetches ADC voltage by calling get_adc_voltage message
+     * @brief Fetches torque by calling get_torque message
      *
      * @param[in] axisID ID that corresponds to message's destination axis
      * @return int returns -1 at bus write failure, 0 at sucess
      */
-    int call_get_adc_voltage(int axisID);
+    int call_get_torque(int axisID);
 
     /**
      * @brief Fetches controller error by calling get_controller_error message
@@ -577,5 +577,5 @@ public:
     * @param axisID Id of selected axis
     * @return true if connection is open and active
     */
-    bool is_connected();
+    bool is_connected(void);
 };

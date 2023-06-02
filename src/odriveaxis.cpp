@@ -70,9 +70,9 @@ std::ostream &operator<<(std::ostream &out, const OdriveAxis &odrive) {
         out << "\tMeasured: " << odrive.iq.iq_measured << std::endl;
     }
 
-    // ADC voltage
-    if (odrive.adc.timestamp.tv_sec > -1)
-        out << "ADC voltage[" << odrive.adc.timestamp << "]: " << odrive.adc.adc_voltage << std::endl;
+    // Torque
+    if (odrive.torque.timestamp.tv_sec > -1)
+        out << "Torque [" << odrive.torque.timestamp << "]: setpoint" << odrive.torque.torque_setpoint << ", estimate: " << odrive.torque.torque_estimate << std::endl;
 
     // Regulator settings
     out << "Absolute position: " << odrive.position << std::endl;
