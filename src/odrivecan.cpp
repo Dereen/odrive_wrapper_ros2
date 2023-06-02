@@ -1255,15 +1255,11 @@ bool OdriveCan::is_axis_active(int axisID) {
         }
 
         int seconds = now.tv_sec - can_msg.tv_sec;
-        int miliseconds = ((now.tv_usec - can_msg.tv_usec) / 1000);
+        int miliseconds = seconds * 1000 + ((now.tv_usec - can_msg.tv_usec) / 1000);
 
-        if ((seconds == 0) && (miliseconds < this->can_timeout_ms))
-            return 1;
-        else if ((seconds == 1) && (60 - miliseconds < this->can_timeout_ms)) {
-            return 1;
-        }
+        return miliseconds < this->can_timeout_ms;
     }
-    return 0;
+    return false;
 }
 
 bool OdriveCan::is_connected(void) {
