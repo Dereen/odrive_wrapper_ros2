@@ -246,8 +246,8 @@ void OdriveCan::process_msgs() {
                         parse_heartbeat(it.first, msg);
                         break;
                     case ESTOP:
-                        //*error_stream << "Got unexpected response from set ESTOP";
-                        break;
+                        *output_stream << "[PROCESS] Estop request confirned" << std::endl;
+			break;
                     case GET_ERROR:
                         parse_error(it.first, msg);
                         break;
@@ -308,7 +308,7 @@ void OdriveCan::process_msgs() {
                         *error_stream << "Got unexpected response from set REBOOT" << std::endl;
                         break;
                     case CLEAR_ERRORS:
-                        *error_stream << "Got unexpected response from set CLEAR_ERRORS" << std::endl;
+			*output_stream << "[PROCESS] Clear errors request confirned." << std::endl;
                         break;
                     case SET_ABSOLUTE_POSITION:
                         *error_stream << "Got unexpected response from set SET_ABSOLUTE_POSITION" << std::endl;
