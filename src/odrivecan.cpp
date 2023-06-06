@@ -464,7 +464,7 @@ int OdriveCan::call_get_version(int axisID) {
             ret = can_dev->send(msg_id, can_msg_len[GET_VERSION], true);
         }
         if (ret < 0) {
-            *error_stream << "[ERROR]  on axis" << axisID << " - GET_VERSION. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR]  on axis" << axisID << " - GET_VERSION. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         }
 
@@ -487,7 +487,7 @@ int OdriveCan::call_estop(int axisID) {
             ret = can_dev->send(msg_id, can_msg_len[ESTOP]);
         }
         if (ret < 0) {
-            *error_stream << "[ERROR] on axis" << axisID << " - ESTOP. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - ESTOP. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         }
 
@@ -515,7 +515,7 @@ int OdriveCan::call_get_error(int axisID) {
             ret = can_dev->send(msg_id, can_msg_len[GET_ERROR], true);
         }
         if (ret < 0) {
-            *error_stream << "[ERROR] on axis" << axisID << " - GET_ERROR. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - GET_ERROR. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         }
 
@@ -543,7 +543,7 @@ int OdriveCan::call_set_axis_node_id(int oldID, uint32_t newID) {
         }
 
         if (ret < 0) {
-            *error_stream << "[ERROR] on axis" << oldID << " - SET_AXIS_NODE_ID. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << oldID << " - SET_AXIS_NODE_ID. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         }
 
@@ -579,7 +579,7 @@ int OdriveCan::call_set_axis_state(int axisID, AxisState req_state) {
             ret = can_dev->send(msg_id, can_msg_len[SET_AXIS_STATE], data);
         }
         if (ret < 0) {
-            *error_stream << "[ERROR] on axis" << axisID << " - SET_AXIS_STATE. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - SET_AXIS_STATE. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         }
 
@@ -606,7 +606,7 @@ int OdriveCan::call_get_encoder_estimates(int axisID) {
             ret = can_dev->send(msg_id, can_msg_len[GET_ENCODER_ESTIMATES], true);
         }
         if (ret < 0) {
-            *error_stream << "[ERROR] on axis" << axisID << " - GET_ENCODER_ESTIMATES. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - GET_ENCODER_ESTIMATES. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         }
 
@@ -634,7 +634,7 @@ int OdriveCan::call_set_controller_mode(int axisID, ControlMode control_mode, In
             ret = can_dev->send(msg_id, can_msg_len[SET_CONTROLLER_MODE], data);
         }
         if (ret < 0) {
-            *error_stream << "[ERROR] on axis" << axisID << " - SET_CONTROLLER_MODE. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - SET_CONTROLLER_MODE. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         }
 
@@ -677,7 +677,7 @@ int OdriveCan::call_set_input_pos(int axisID, float input_pos, float vel_ff, flo
             ret = can_dev->send(msg_id, can_msg_len[SET_INPUT_POS], data);
         }
         if (ret < 0) {
-            *error_stream << "[ERROR] on axis" << axisID << " - SET_INPUT_POS. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - SET_INPUT_POS. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         }
 
@@ -711,7 +711,7 @@ int OdriveCan::call_set_input_vel(int axisID, float input_vel, float input_torqu
             ret = can_dev->send(msg_id, can_msg_len[SET_INPUT_VEL], data);
         }
         if (ret < 0) {
-            *error_stream << "[ERROR] on axis" << axisID << " - SET_INPUT_VEL. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - SET_INPUT_VEL. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         }
 
@@ -746,7 +746,7 @@ int OdriveCan::call_set_input_torque(int axisID, float torque) {
             ret = can_dev->send(msg_id, can_msg_len[SET_INPUT_TORQUE], data);
         }
         if (ret < 0) {
-            *error_stream << "[ERROR] on axis" << axisID << " - SET_INPUT_TORQUE. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - SET_INPUT_TORQUE. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         }
 
@@ -780,7 +780,7 @@ int OdriveCan::call_set_limits(int axisID, float velocity, float current) {
             ret = can_dev->send(msg_id, can_msg_len[SET_LIMITS], data);
         }
         if (ret < 0) {
-            *error_stream << "[ERROR] on axis" << axisID << " - SET_LIMITS. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - SET_LIMITS. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         }
 
@@ -812,7 +812,7 @@ int OdriveCan::call_start_anticogging(int axisID) {
             ret = can_dev->send(msg_id, can_msg_len[START_ANTICOGGING]);
         }
         if (ret < 0) {
-            *error_stream << "[ERROR] on axis" << axisID << " - START_ANTICOGGING. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - START_ANTICOGGING. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         }
 
@@ -847,7 +847,7 @@ int OdriveCan::call_set_traj_vel_limit(int axisID, float lim) {
             ret = can_dev->send(msg_id, can_msg_len[SET_TRAJ_VEL_LIMIT], data);
         }
         if (ret < 0) {
-            *error_stream << "[ERROR] on axis" << axisID << " - SET_TRAJ_VEL_LIMIT. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - SET_TRAJ_VEL_LIMIT. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         }
 
@@ -881,7 +881,7 @@ int OdriveCan::call_set_traj_accel_limits(int axisID, float accel, float decel) 
             ret = can_dev->send(msg_id, can_msg_len[SET_TRAJ_ACCEL_LIMITS], data);
         }
         if (ret < 0) {
-            *error_stream << "[ERROR] on axis" << axisID << " - SET_TRAJ_ACCEL_LIMITS. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - SET_TRAJ_ACCEL_LIMITS. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         }
 
@@ -917,7 +917,7 @@ int OdriveCan::call_set_traj_inertia(int axisID, float inertia) {
             ret = can_dev->send(msg_id, can_msg_len[SET_TRAJ_INERTIA], data);
         }
         if (ret < 0) {
-            *error_stream << "[ERROR] on axis" << axisID << " - SET_TRAJ_INERTIA. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - SET_TRAJ_INERTIA. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         };
 
@@ -949,7 +949,7 @@ int OdriveCan::call_get_iq(int axisID) {
             ret = can_dev->send(msg_id, can_msg_len[GET_IQ], true);
         }
         if (ret < 0) {
-            *error_stream << "[ERROR] on axis" << axisID << " - GET_IQ. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - GET_IQ. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         }
 
@@ -972,7 +972,7 @@ int OdriveCan::call_get_tempterature(int axisID) {
             ret = can_dev->send(msg_id, can_msg_len[GET_TEMP], true);
         }
         if (ret < 0) {
-            *error_stream << "[ERROR] on axis" << axisID << " - GET_TEMP. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - GET_TEMP. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         }
 
@@ -995,7 +995,7 @@ int OdriveCan::call_reboot(int axisID) {
             ret = can_dev->send(msg_id, can_msg_len[REBOOT]);
         }
         if (ret < 0) {
-            *error_stream << "[ERROR] on axis" << axisID << " - REBOOT. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - REBOOT. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         }
 
@@ -1026,7 +1026,7 @@ int OdriveCan::call_get_bus_ui(int axisID) {
         }
         if (ret < 0) {
 
-            *error_stream << "[ERROR] on axis" << axisID << " - GET_BUS_VOLTAGE_CURRENT. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - GET_BUS_VOLTAGE_CURRENT. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         }
 
@@ -1050,7 +1050,7 @@ int OdriveCan::call_clear_errors(int axisID) {
         }
         if (ret < 0) {
 
-            *error_stream << "[ERROR] on axis" << axisID << " - CLEAR_ERRORS. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - CLEAR_ERRORS. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         }
 
@@ -1076,7 +1076,7 @@ int OdriveCan::call_set_absolute_position(int axisID, float pos) {
             ret = can_dev->send(msg_id, can_msg_len[SET_ABSOLUTE_POSITION], data);
         }
         if (ret < 0) {
-            *error_stream << "[ERROR] on axis" << axisID << " - SET_ABSOLUTE_POSITION. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - SET_ABSOLUTE_POSITION. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         };
 
@@ -1107,7 +1107,7 @@ int OdriveCan::call_set_pos_gain(int axisID, float gain) {
             ret = can_dev->send(msg_id, can_msg_len[SET_POS_GAIN], data);
         }
         if (ret < 0) {
-            *error_stream << "[ERROR] on axis" << axisID << " - SET_POS_GAIN. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - SET_POS_GAIN. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         };
 
@@ -1145,7 +1145,7 @@ int OdriveCan::call_set_vel_gains(int axisID, float gain, float integrator) {
         }
         if (ret < 0) {
 
-            *error_stream << "[ERROR] on axis" << axisID << " - SET_VEL_GAINS. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - SET_VEL_GAINS. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         };
 
@@ -1178,7 +1178,7 @@ int OdriveCan::call_get_torque(int axisID) {
         }
         if (ret < 0) {
 
-            *error_stream << "[ERROR] on axis" << axisID << " - GET_TORQUE. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - GET_TORQUE. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         }
 
@@ -1202,7 +1202,7 @@ int OdriveCan::call_get_controller_error(int axisID) {
         }
         if (ret < 0) {
 
-            *error_stream << "[ERROR] on axis" << axisID << " - GET_CONTROLLER_ERROR. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - GET_CONTROLLER_ERROR. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         }
 
@@ -1226,7 +1226,7 @@ int OdriveCan::call_enter_dfu_mode(int axisID) {
         }
         if (ret < 0) {
 
-            *error_stream << "[ERROR] on axis" << axisID << " - ENTER_DFU_MODE. The wrong number of bytes were written to CAN" << std::endl;
+            *error_stream << "[ERROR] on axis" << axisID << " - ENTER_DFU_MODE. The wrong number of bytes were written to CAN. Written: " << ret << ", expected: " << can_msg_len[SET_INPUT_POS] << std::endl;
             return ret;
         }
 
