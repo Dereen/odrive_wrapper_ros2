@@ -674,7 +674,7 @@ int OdriveCan::call_set_input_pos(int axisID, float input_pos, float vel_ff, flo
         {
             std::lock_guard<std::mutex> guard(send_mutex);
 
-            int ret = can_dev->send(msg_id, can_msg_len[SET_INPUT_POS], data);
+            ret = can_dev->send(msg_id, can_msg_len[SET_INPUT_POS], data);
         }
         if (ret < 0) {
             *error_stream << "[ERROR] on axis" << axisID << " - SET_INPUT_POS. The wrong number of bytes were written to CAN" << std::endl;
