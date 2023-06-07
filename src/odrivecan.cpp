@@ -1167,9 +1167,9 @@ int OdriveCan::call_set_vel_gains(int axisID, float gain, float integrator) {
 int OdriveCan::call_get_torque(int axisID) {
     if (key_present(axes_ids, axisID)) {
         int msg_id = (axisID * 0x20) + GET_TORQUE; // axis ID + can msg name
-#ifdef DEBUG
-        *output_stream << "[GetADC] Ask for ADC voltage - CAN msg ID " << std::hex << msg_id << std::dec << std::endl;
-#endif
+//#ifdef DEBUG
+       *output_stream << "[GetADC] Ask for Torque - CAN msg ID " << std::hex << msg_id << std::dec << std::endl;
+//#endif
         int ret = -1;
 
         {
