@@ -652,8 +652,6 @@ int OdriveCan::call_set_controller_mode(int axisID, ControlMode control_mode, In
 }
 
 int OdriveCan::call_set_input_pos(int axisID, float input_pos, float vel_ff, float torque_ff) {
-    *output_stream << "testing key present for " << std::to_string(axisID) << std::endl;
-
     if (key_present(axes_ids, axisID)) {
         int msg_id = axisID << 5 | SET_INPUT_POS; // axis ID + can msg name
 #ifdef DEBUG
