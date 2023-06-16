@@ -246,7 +246,7 @@ void OdriveCan::process_msgs() {
                         parse_heartbeat(it.first, msg);
                         break;
                     case ESTOP:
-                        *output_stream << "[PROCESS] Estop request confirned" << std::endl;
+                        *output_stream << "[PROCESS] Emergency stop request confirned" << std::endl;
 			break;
                     case GET_ERROR:
                         parse_error(it.first, msg);

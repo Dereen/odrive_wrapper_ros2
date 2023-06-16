@@ -216,7 +216,7 @@ static std::map<DisarmReason, std::string> disarm_reason_map = {
         {VELOCITY_LIMIT_VIOLATION,                  "Velocity limit violation"},
         {POSITION_LIMIT_VIOLATION,                  "Position limit violation"},
         {WATCHDOG_TIMER_EXPIRED,                    "Watchdog timer expired"},
-        {ESTOP_REQUESTED,                           "Estop requested"},
+        {ESTOP_REQUESTED,                           "Emergency stop requested"},
         {SPINOUT_DETECTED,                          "Spinout detected"},
         {OTHER_DEVICE_FAILED,                       "Other device failed"},
         {CALIBRATION_ERROR,                         "Calibration error"}};

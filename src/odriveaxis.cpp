@@ -94,7 +94,7 @@ std::ostream &operator<<(std::ostream &out, const OdriveAxis &odrive) {
     }
 
     if (odrive.estop.tv_sec > 0)
-        out << "Estop was called [" << odrive.estop << "] " << std::endl;
+        out << "Emergency stop was called [" << odrive.estop << "] " << std::endl;
 
     if (odrive.reboot_timestamp.tv_sec > -1)
         out << "Odrive was rebooted [" << odrive.reboot_timestamp << "]" << std::endl;
