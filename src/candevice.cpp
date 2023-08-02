@@ -8,7 +8,7 @@
  # @copyright (c) JettyVision s.r.o in Prague 2023 - All Rights Reserved
  * 
  */
-#include "candevice.h"
+#include "odrive_wrapper/candevice.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,6 +17,8 @@
 #include <iostream>
 #include <string.h>
 #include <cstring>
+
+using namespace odrive_wrapper;
 
 int CanDevice::send(uint16_t id, uint16_t dlc, char *data, bool rtr) {
 

@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>odrive_wrapper</name>
+  <version>1.0.0</version>
+  <description>C++ odrive CAN wrapper</description>
+
+  <license>Copyright (c) JettyVision s.r.o in Prague  - All Rights Reserved</license>
+  <author email="zigajkova@jettyvision.com">Anna Zigajkova</author>
+  <maintainer email="cihala@jettyvision.com">Valentyn Cihala</maintainer>
+
+  <buildtool_depend>cmake</buildtool_depend>
+  
+  <export>
+    <build_type>cmake</build_type>
+  </export>
+</package>

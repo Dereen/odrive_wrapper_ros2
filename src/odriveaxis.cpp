@@ -9,13 +9,15 @@
  *
  */
 
-#include "odriveaxis.h"
+#include "odrive_wrapper/odriveaxis.h"
+
+using namespace odrive_wrapper;
 
 std::string italic(std::string s) {
     return "\e[3m" + s + "\e[0m";
 }
 
-std::ostream &operator<<(std::ostream &out, const OdriveAxis &odrive) {
+std::ostream& odrive_wrapper::operator<<(std::ostream &out, const OdriveAxis &odrive) {
     // print Odrive version
     if (odrive.ver.timestamp.tv_sec > -1) {
         out << "Odrive version [" << odrive.ver.timestamp << "]:" << std::endl;

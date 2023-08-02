@@ -20,10 +20,12 @@
 #include <unordered_map>
 #include <sys/time.h>
 
-#include "candevice.h"
-#include "odriveaxis.h"
-#include "odrivecan.h"
-#include "helpers.h"
+#include "odrive_wrapper/candevice.h"
+#include "odrive_wrapper/odriveaxis.h"
+#include "odrive_wrapper/odrivecan.h"
+#include "odrive_wrapper/helpers.h"
+
+using namespace odrive_wrapper;
 
 void OdriveCan::init() {
     assert(axes_num != 0);
@@ -215,7 +217,7 @@ void OdriveCan::receive_msgs() {
     }
 
     *output_stream << "[RECEIVE] End recieve thread" << std::endl;
-};
+}
 
 void OdriveCan::process_msgs() {
     *output_stream << "[PROCESS] start processing thread" << std::endl;
@@ -442,7 +444,7 @@ void OdriveCan::parse_controller_error(int axisID, canMsg msg) {
     }
 }
 
-std::ostream &operator<<(std::ostream &out, const OdriveCan &odrive) {
+std::ostream& odrive_wrapper::operator<<(std::ostream &out, const OdriveCan &odrive) {
     for (auto &it: odrive.axes_ids) {
         out << "\n~~~~Axis ID " << it.first << " ~~~~" << std::endl;
         out << odrive[it.second];

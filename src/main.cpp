@@ -2,7 +2,9 @@
 #include <unistd.h>
 #include <iostream>
 
-#include "odrivecan.h"
+#include "odrive_wrapper/odrivecan.h"
+
+using namespace odrive_wrapper;
 
 int main(int argc, char **argv) {
     printf("create can device\n");
