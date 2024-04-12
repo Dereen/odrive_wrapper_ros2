@@ -126,7 +126,11 @@ int CanDevice::recieve(struct can_frame *frame, struct timeval *timestamp, int m
         return 1;
     } else { // get timestamp
 
+#ifdef SIOCGSTAMP
         int error = ioctl(s, SIOCGSTAMP, timestamp);
+#else
+        int error = ioctl(s, SIOCGSTAMP_OLD, timestamp);
+#endif
 
         if (error < 0) {
             *error_stream << "[CanDev] Read error: " << std::strerror(errno) << std::endl;

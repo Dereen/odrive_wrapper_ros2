@@ -13,63 +13,63 @@ include(CMakePackageConfigHelpers)
 
 cmake_minimum_required(VERSION 2.8.12)
 project(odrive_wrapper)
-set(ODRIVE_WRAPPER_VERSION 1.0)
+set(ODRIVE_VERSION 1.0)
 set(CMAKE_CXX_STANDARD 11)
 
 # install location of generated cmake config files
-set(ConfigPackageLocation ${CMAKE_INSTALL_LIBDIR}/${CMAKE_PROJECT_NAME}/cmake)
+set(ConfigPackageLocation ${CMAKE_INSTALL_LIBDIR}/${PROJECT_NAME}/cmake)
 
 # Output more warnings
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-std=c++11 -Wall -pthread -Wextra -Wpedantic -fPIC)
 endif()
 
-###################
-# target defintions
-###################
+#######################
+# general configuration
+#######################
 
-#include_directories(include)
-
-add_library(${PROJECT_NAME}_lib src/candevice.cpp src/odrivecan.cpp src/odriveaxis.cpp)
+add_library(${PROJECT_NAME} src/candevice.cpp src/odrivecan.cpp src/odriveaxis.cpp)
 # target sources is IDE friendly (especially for INTERFACE libs)
-target_sources(${CMAKE_PROJECT_NAME}_lib PRIVATE
+target_sources(${PROJECT_NAME} PRIVATE
   src/candevice.cpp src/odriveaxis.cpp src/odrivecan.cpp)
+
 # different locations on build and after install
-target_include_directories(${CMAKE_PROJECT_NAME}_lib PUBLIC
+target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-target_link_libraries(${PROJECT_NAME}_lib -pthread)
+target_link_libraries(${PROJECT_NAME} -pthread)
 
 add_executable(odrivecan_test src/main.cpp)
-target_link_libraries(odrivecan_test ${PROJECT_NAME}_lib)
+target_link_libraries(odrivecan_test ${PROJECT_NAME})
 
 #################
 # install targets
 #################
 
 # libs and binaries, generate export targets
-install(TARGETS ${CMAKE_PROJECT_NAME}_lib
-  EXPORT ${CMAKE_PROJECT_NAME}Targets
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS ${PROJECT_NAME}
+    EXPORT ${PROJECT_NAME}Targets
+      ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 # header files, note the "/" after include
 install(DIRECTORY include/
-  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 ################
 # export targets
 ################
 
 # for build tree / in workspace
-export(EXPORT ${CMAKE_PROJECT_NAME}Targets
-  FILE ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_PROJECT_NAME}Targets.cmake
-  NAMESPACE ${CMAKE_PROJECT_NAME}::)
+export(EXPORT ${PROJECT_NAME}Targets
+        FILE ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Targets.cmake
+        NAMESPACE ${PROJECT_NAME}::)
 # exported targets
-install(EXPORT ${CMAKE_PROJECT_NAME}Targets
-  FILE ${CMAKE_PROJECT_NAME}Targets.cmake
-  NAMESPACE ${CMAKE_PROJECT_NAME}::
-  DESTINATION ${ConfigPackageLocation})
+install(EXPORT ${PROJECT_NAME}Targets
+        FILE ${PROJECT_NAME}Targets.cmake
+        NAMESPACE ${PROJECT_NAME}::
+        DESTINATION ${ConfigPackageLocation})
 
 ###########################
 # CMake package generation
@@ -77,20 +77,20 @@ install(EXPORT ${CMAKE_PROJECT_NAME}Targets
 
 # generate package version file
 write_basic_package_version_file(
-  ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_PROJECT_NAME}ConfigVersion.cmake
-  VERSION ${ODRIVE_WRAPPER_VERSION}
-  COMPATIBILITY SameMajorVersion)
+        ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake
+        VERSION ${ODRIVE_VERSION}
+        COMPATIBILITY SameMajorVersion)
 
 # generate package configuration file
 set(INCLUDE_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR})
 configure_package_config_file(
-  ${CMAKE_PROJECT_NAME}Config.cmake.in
-  ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_PROJECT_NAME}Config.cmake
-  INSTALL_DESTINATION ${ConfigPackageLocation}
-  PATH_VARS INCLUDE_INSTALL_DIR)
+        ${PROJECT_NAME}Config.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake
+        INSTALL_DESTINATION ${ConfigPackageLocation}
+        PATH_VARS INCLUDE_INSTALL_DIR)
 
 # install the package configuration files
-install(FILES 
-  ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_PROJECT_NAME}Config.cmake
-  ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_PROJECT_NAME}ConfigVersion.cmake
-  DESTINATION ${ConfigPackageLocation})
+install(FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake
+        DESTINATION ${ConfigPackageLocation})

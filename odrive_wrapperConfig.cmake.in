@@ -7,10 +7,10 @@ include(${CMAKE_CURRENT_LIST_DIR}/odrive_wrapperTargets.cmake)
 
 # define INCLUDE_DIRS and LIBRARIES, required for catkin_package
 set_and_check(odrive_wrapper_INCLUDE_DIRS "@PACKAGE_INCLUDE_INSTALL_DIR@")
-set(odrive_wrapper_LIBRARIES odrive_wrapper::odrive_wrapper_lib)
+set(odrive_wrapper_LIBRARIES odrive_wrapper)
 
 
-# forward dependencies AFTER expanding the @PACKAGE_<...>@ macros!!!
+# forward dependencies AFTER expanding the @PACKAGE_<...>@l macros!!!
 # otherwise the expanded paths might point to a found package
 include(CMakeFindDependencyMacro)
 
