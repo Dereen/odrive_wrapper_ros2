@@ -12,6 +12,20 @@ include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
 cmake_minimum_required(VERSION 2.8.12)
+
+# Check if ROS2 is sourced
+if(NOT DEFINED ENV{ROS_DISTRO})
+  message(FATAL_ERROR
+    "\n"
+    "========================================\n"
+    "  ROS2 environment is not sourced!\n"
+    "========================================\n"
+    "  Please run: source /opt/ros/jazzy/setup.bash\n"
+    "  before running colcon build.\n"
+    "========================================\n"
+  )
+endif()
+
 project(odrive_wrapper)
 set(ODRIVE_VERSION 1.0)
 set(CMAKE_CXX_STANDARD 11)

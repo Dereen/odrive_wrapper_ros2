@@ -355,7 +355,7 @@ void OdriveCan::parse_version(int axisID, canMsg msg) {
 }
 
 void OdriveCan::parse_heartbeat(int axisID, canMsg msg) {
-    uint32_t err = get32from8(msg.frame.data, 0, lsb);
+    uint32_t err = get32from8(msg.frame.data, CAN_MAX_DLEN, 0, lsb);
 
     {
         std::lock_guard<std::mutex> guard(data_mutex);
@@ -370,8 +370,8 @@ void OdriveCan::parse_heartbeat(int axisID, canMsg msg) {
 }
 
 void OdriveCan::parse_error(int axisID, canMsg msg) {
-    uint32_t err = get32from8(msg.frame.data, 0, lsb);
-    uint32_t reason = get32from8(msg.frame.data, 4, lsb);
+    uint32_t err = get32from8(msg.frame.data, CAN_MAX_DLEN, 0, lsb);
+    uint32_t reason = get32from8(msg.frame.data, CAN_MAX_DLEN, 4, lsb);
     {
         std::lock_guard<std::mutex> guard(data_mutex);
         axes[axisID].err.active_errors = err;
@@ -381,8 +381,8 @@ void OdriveCan::parse_error(int axisID, canMsg msg) {
 }
 
 void OdriveCan::parse_encoder_estimates(int axisID, canMsg msg) {
-    float pos = get_float(get32from8(msg.frame.data, 0, lsb));
-    float vel = get_float(get32from8(msg.frame.data, 4, lsb));
+    float pos = get_float(get32from8(msg.frame.data, CAN_MAX_DLEN, 0, lsb));
+    float vel = get_float(get32from8(msg.frame.data, CAN_MAX_DLEN, 4, lsb));
     {
         std::lock_guard<std::mutex> guard(data_mutex);
         axes[axisID].encoder.pos_estimate = pos;
@@ -392,8 +392,8 @@ void OdriveCan::parse_encoder_estimates(int axisID, canMsg msg) {
 }
 
 void OdriveCan::parse_iq(int axisID, canMsg msg) {
-    float setpoint = get_float(get32from8(msg.frame.data, 0, lsb));
-    float measured = get_float(get32from8(msg.frame.data, 4, lsb));
+    float setpoint = get_float(get32from8(msg.frame.data, CAN_MAX_DLEN, 0, lsb));
+    float measured = get_float(get32from8(msg.frame.data, CAN_MAX_DLEN, 4, lsb));
     {
         std::lock_guard<std::mutex> guard(data_mutex);
         axes[axisID].iq.iq_measured = measured;
@@ -403,8 +403,8 @@ void OdriveCan::parse_iq(int axisID, canMsg msg) {
 }
 
 void OdriveCan::parse_temp(int axisID, canMsg msg) {
-    float fet = get_float(get32from8(msg.frame.data, 0, lsb));
-    float motor = get_float(get32from8(msg.frame.data, 4, lsb));
+    float fet = get_float(get32from8(msg.frame.data, CAN_MAX_DLEN, 0, lsb));
+    float motor = get_float(get32from8(msg.frame.data, CAN_MAX_DLEN, 4, lsb));
     {
         std::lock_guard<std::mutex> guard(data_mutex);
         axes[axisID].temp.fet_temperature = fet;
@@ -414,8 +414,8 @@ void OdriveCan::parse_temp(int axisID, canMsg msg) {
 }
 
 void OdriveCan::parse_ui(int axisID, canMsg msg) {
-    float voltage = get_float(get32from8(msg.frame.data, 0, lsb));
-    float current = get_float(get32from8(msg.frame.data, 4, lsb));
+    float voltage = get_float(get32from8(msg.frame.data, CAN_MAX_DLEN, 0, lsb));
+    float current = get_float(get32from8(msg.frame.data, CAN_MAX_DLEN, 4, lsb));
     {
         std::lock_guard<std::mutex> guard(data_mutex);
         axes[axisID].ui.bus_voltage = voltage;
@@ -425,8 +425,8 @@ void OdriveCan::parse_ui(int axisID, canMsg msg) {
 }
 
 void OdriveCan::parse_torque(int axisID, canMsg msg) {
-    float setpoint = get_float(get32from8(msg.frame.data, 0, lsb));
-    float estimate = get_float(get32from8(msg.frame.data, 4, lsb));
+    float setpoint = get_float(get32from8(msg.frame.data, CAN_MAX_DLEN, 0, lsb));
+    float estimate = get_float(get32from8(msg.frame.data, CAN_MAX_DLEN, 4, lsb));
     {
         std::lock_guard<std::mutex> guard(data_mutex);
         axes[axisID].torque.torque_setpoint = setpoint;
@@ -436,7 +436,7 @@ void OdriveCan::parse_torque(int axisID, canMsg msg) {
 }
 
 void OdriveCan::parse_controller_error(int axisID, canMsg msg) {
-    uint32_t err = get32from8(msg.frame.data, 0, lsb);
+    uint32_t err = get32from8(msg.frame.data, CAN_MAX_DLEN, 0, lsb);
     {
         std::lock_guard<std::mutex> guard(data_mutex);
         axes[axisID].err.controller_error = (ControllerError) err;

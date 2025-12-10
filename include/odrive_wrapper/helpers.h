@@ -14,6 +14,8 @@
 
 #include <unordered_map>
 #include <cstring>
+#include <algorithm>
+#include <stdexcept>
 #include <linux/can.h>
 
 namespace odrive_wrapper
@@ -24,21 +26,33 @@ namespace odrive_wrapper
      * @param[in] unordered map in whith the key is searched for
      * @param[in] key the key, which presence is checked for
      */
-    bool inline key_present(std::unordered_map<int, int> m, int key)
+    bool inline key_present(const std::unordered_map<int, int>& m, int key)
     {
-        // Key is not present
-        if (m.count(key) == 0)
-            return false;
-
-        return true;
+        return m.count(key) != 0;
     }
 
-    uint32_t inline get32from8(uint8_t *data, int startIdx, bool lsb = true)
+    /**
+     * @brief Extracts a 32-bit unsigned integer from an 8-bit array
+     *
+     * @param data Pointer to the data array (must have at least startIdx+4 bytes available)
+     * @param dataSize Size of the data array in bytes
+     * @param startIdx Starting index in the array (must be <= dataSize-4)
+     * @param lsb True for LSB first (little-endian), false for MSB first (big-endian)
+     * @return uint32_t The extracted 32-bit value
+     * @throws std::out_of_range if startIdx+3 >= dataSize
+     */
+    uint32_t inline get32from8(const uint8_t *data, size_t dataSize, size_t startIdx, bool lsb = true)
     {
+        // Bounds checking to prevent buffer overflow
+        if (startIdx + 4 > dataSize)
+        {
+            throw std::out_of_range("get32from8: startIdx + 4 exceeds data buffer size");
+        }
+
         if (!lsb)
-            return data[startIdx] | data[startIdx + 1] << 8 | data[startIdx + 2] << 16 | data[startIdx + 3] << 24;
+            return data[startIdx] | (data[startIdx + 1] << 8) | (data[startIdx + 2] << 16) | (data[startIdx + 3] << 24);
         else
-            return data[startIdx + 3] | data[startIdx + 2] << 8 | data[startIdx + 1] << 16 | data[startIdx] << 24;
+            return data[startIdx + 3] | (data[startIdx + 2] << 8) | (data[startIdx + 1] << 16) | (data[startIdx] << 24);
     }
 
     float inline get_float(uint32_t f)
@@ -50,14 +64,21 @@ namespace odrive_wrapper
         return ret;
     }
     /** See https://stackoverflow.com/questions/1659440/32-bit-to-16-bit-floating-point-conversion*/
+    /** Fixed: Using memcpy instead of type-punning to avoid undefined behavior */
     float inline as_float(const uint x)
     {
-        return *(float *)&x;
+        static_assert(sizeof(float) == sizeof(uint), "float and uint must have same size");
+        float ret;
+        std::memcpy(&ret, &x, sizeof(float));
+        return ret;
     }
 
     uint inline as_uint(const float x)
     {
-        return *(uint *)&x;
+        static_assert(sizeof(float) == sizeof(uint), "float and uint must have same size");
+        uint ret;
+        std::memcpy(&ret, &x, sizeof(uint));
+        return ret;
     }
 
     ushort inline float_to_half(const float x)
@@ -77,7 +98,7 @@ namespace odrive_wrapper
     }
 
     template <typename T>
-    void inline get_char_from_num(char *arr, T var, bool lsb)
+    void inline get_char_from_num(char *arr, const T var, const bool lsb)
     {
         memcpy(arr, &var, sizeof(T));
 
@@ -86,14 +107,14 @@ namespace odrive_wrapper
     }
 
     template <typename T>
-    void inline get_char_from_nums(char *arr, T var1, T var2, bool lsb)
+    void inline get_char_from_nums(char *arr, const T var1, const T var2, const bool lsb)
     {
         get_char_from_num<T>(arr, var1, lsb);
         get_char_from_num<T>(arr + sizeof(T), var2, lsb);
     }
 
     template <typename T, typename F>
-    void inline get_char_from_nums(char *arr, T var1, F var2, F var3, bool lsb)
+    void inline get_char_from_nums(char *arr, const T var1, const F var2, const F var3, const bool lsb)
     {
         get_char_from_num<T>(arr, var1, lsb);
         get_char_from_num<F>(arr + sizeof(T), var2, lsb);
@@ -101,14 +122,14 @@ namespace odrive_wrapper
     }
 
     template <typename T>
-    void inline get_char_from_nums(char *arr, T var1, T var2, T var3, bool lsb)
+    void inline get_char_from_nums(char *arr, const T var1, const T var2, const T var3, const bool lsb)
     {
         get_char_from_num<T>(arr, var1, lsb);
         get_char_from_num<T>(arr + sizeof(T), var2, lsb);
         get_char_from_num<T>(arr + 2 * sizeof(T), var3, lsb);
     }
 
-    void inline get_char_for_short_float(char *arr, float in, bool lsb)
+    void inline get_char_for_short_float(char *arr, const float in, const bool lsb)
     {
         get_char_from_num<ushort>(arr, float_to_half(in), lsb);
     }

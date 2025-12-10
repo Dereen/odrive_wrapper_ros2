@@ -9,3 +9,10 @@ odrive_settings.txt
 build/*
 html/*
 Doxyfile*
+
+# Colcon build artifacts (should only be at workspace root)
+install/
+log/
+
+# Claude Code
+CLAUDE.md
