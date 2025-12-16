@@ -93,7 +93,6 @@ void OdriveCan::start(void) {
         }
     }
 
-    *output_stream << "[OdriveCan] start threads" << std::endl;
     th_recieve = std::thread(&OdriveCan::receive_msgs, this);
     th_process = std::thread(&OdriveCan::process_msgs, this);
     th_send = std::thread(&OdriveCan::ask_for_current_values, this);
@@ -144,7 +143,6 @@ void OdriveCan::ask_for_current_values() {
     }
 
     while (run) {
-
         for (auto &id: ids) {
             // *output_stream << "ask for temp" << std::endl;
             call_get_tempterature(id);
@@ -193,7 +191,12 @@ void OdriveCan::receive_msgs() {
 
     while (run) {
         // read messages
-        can_dev->recieve(&frame, &timestamp, 1);
+        int ret = can_dev->recieve(&frame, &timestamp, 1);
+        if (ret != 0) {
+            // Failed to receive valid data, skip processing
+            continue;
+        }
+
         ax_id = axis_from_header(frame.can_id);
 
         //  store message with timestamp

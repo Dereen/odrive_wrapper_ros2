@@ -17,6 +17,7 @@
 #include <iostream>
 #include <string.h>
 #include <cstring>
+#include <sys/time.h>
 
 using namespace odrive_wrapper;
 
@@ -38,7 +39,6 @@ int CanDevice::send(uint16_t id, uint16_t dlc, char *data, bool rtr) {
     int ret = write(s, &f, sizeof(struct can_frame));
     if (ret != sizeof(struct can_frame)) {
         *error_stream << "[CanDev] Write error: " << std::strerror(errno) << std::endl;
-        ///*output_stream << "wrote " << ret << "bytes\n";
         return -1;
     }
 
@@ -69,7 +69,6 @@ int CanDevice::send(uint16_t id, uint16_t dlc, bool rtr) {
     int ret = write(s, &f, sizeof(struct can_frame));
     if (ret != sizeof(struct can_frame)) {
         *error_stream << "[CanDev] Write error: " << std::strerror(errno) << std::endl;
-        //*output_stream << "wrote " << ret << " bytes\n";
         return -1;
     }
 
@@ -87,8 +86,6 @@ int CanDevice::send(uint16_t id, uint16_t dlc, bool rtr) {
 }
 
 int CanDevice::set_filter(uint16_t id, uint16_t mask) {
-    *output_stream << "[CanDev] Set message filter for msg id " << id << " with mask " << mask << std::endl;
-
     int nbytes;
     struct can_frame frame;
     struct can_filter rfilter[1];
@@ -118,77 +115,54 @@ int CanDevice::set_filter(uint16_t id, uint16_t mask) {
 }
 
 int CanDevice::recieve(struct can_frame *frame, struct timeval *timestamp, int msg_num) {
-    // read a single can frame
     int nbytes = read(s, frame, sizeof(struct can_frame) * msg_num);
-
-    if (nbytes < 0) { // nothing to read -> error, should at least get heartbeat
+    if (nbytes < 0) {
         *output_stream << "Read error: " << std::strerror(errno) << std::endl;
         return 1;
-    } else { // get timestamp
-
+    } else {
 #ifdef SIOCGSTAMP
         int error = ioctl(s, SIOCGSTAMP, timestamp);
 #else
         int error = ioctl(s, SIOCGSTAMP_OLD, timestamp);
 #endif
-
         if (error < 0) {
             *error_stream << "[CanDev] Read error: " << std::strerror(errno) << std::endl;
             return 1;
         }
     }
 
-#ifdef DEBUG
-    for (int j = 0; j < msg_num; ++j)
-    {
-       *output_stream << "0x%03X [%d] ", frame->can_id, frame->can_dlc;
-
-        for (int i = 0; i < frame->can_dlc; i++)
-           *output_stream << "%02X ", frame->data[i];
-
-       *output_stream << std::endl;
-    }
-#endif
-
     return 0;
 }
 
 int CanDevice::init_connection() {
-    *output_stream << "[CanDev] Init connection: " << std::strerror(errno) << std::endl;
-
     if ((this->s = socket(PF_CAN, SOCK_RAW, CAN_RAW)) < 0) {
         *error_stream << "[CanDev] Socket error: " << std::strerror(errno) << std::endl;
         return 1;
     }
-
-    strcpy(this->ifr.ifr_name, this->dev_name.c_str()); // fill the ifreq name parameter by value can0
-    ioctl(this->s, SIOCGIFINDEX, &this->ifr);            // Get the index number of a Linux network interface
-
-    // set can address
+    strcpy(this->ifr.ifr_name, this->dev_name.c_str());
+    ioctl(this->s, SIOCGIFINDEX, &this->ifr);
     struct sockaddr_can tmp;
     addr = &tmp;
     memset(&tmp, 0, sizeof(tmp));
-
     tmp.can_family = AF_CAN;
     tmp.can_ifindex = this->ifr.ifr_ifindex;
-
-    // open socket
     if (bind(this->s, (struct sockaddr *) &tmp, sizeof(tmp)) < 0) {
         *error_stream << "[CanDev] Bind: " << std::strerror(errno) << std::endl;
         return 1;
     }
+
     this->active = true;
-
     *output_stream << "[CanDev] Opened CAN socket with device " << this->dev_name.c_str() << std::endl;
-
     return 0;
 }
 
 int CanDevice::close_connection() {
-    // close socket
-    if (close(this->s) < 0) {
-        *error_stream << "[CanDev] Close: " << std::strerror(errno) << std::endl;
-        return 1;
+    // close socket only if valid (not -1)
+    if (this->s >= 0) {
+        if (close(this->s) < 0) {
+            *error_stream << "[CanDev] Close: " << std::strerror(errno) << std::endl;
+            return 1;
+        }
     }
 
     this->active = false;

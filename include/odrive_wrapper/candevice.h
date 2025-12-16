@@ -36,7 +36,7 @@ namespace odrive_wrapper {
     class CanDevice {
 
     private:
-        int s;                       /*!< Socket id, filled automatically */
+        int s = -1;                  /*!< Socket id, filled automatically. Default -1 for uninitialized state */
         struct ifreq ifr;           /*!< Structure with CAN socket info */
         struct sockaddr_can *addr; /*!< Reference to CAN socket address */
         std::string dev_name;       /*!< CAN device name, dafaults to can0 */
