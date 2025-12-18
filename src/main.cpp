@@ -6,7 +6,7 @@
 
 using namespace odrive_wrapper;
 
-int main(int argc, char **argv) {
+int main(int argc __attribute__((unused)), char **argv __attribute__((unused))) {
     printf("create can device\n");
     OdriveCan odrive(2);
 
@@ -21,9 +21,6 @@ int main(int argc, char **argv) {
     odrive.call_set_input_vel(1, 1, 0);
     // odrive->call_reboot(0);
     //odrive->call_get_controller_error(0);
-
-    const OdriveAxis &data = odrive[0];
-
 
     // print axis stats
     for (auto i = 0; i < 5; i++) {

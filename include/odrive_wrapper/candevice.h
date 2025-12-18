@@ -134,7 +134,7 @@ namespace odrive_wrapper {
     static inline std::ostream &operator<<(std::ostream &out, struct timeval const *time) {
         if (time->tv_sec > -1) {
 
-            char tmbuf[64], buf[64];
+            char tmbuf[64], buf[80];
 
             struct tm *nowtm = localtime(&time->tv_sec);
             strftime(tmbuf, sizeof tmbuf, "%Y-%m-%d %H:%M:%S", nowtm);
@@ -148,7 +148,7 @@ namespace odrive_wrapper {
 
     static inline std::ostream &operator<<(std::ostream &out, struct timeval const &time) {
         if (time.tv_sec > -1) {
-            char tmbuf[64], buf[64];
+            char tmbuf[64], buf[80];
 
             struct tm *nowtm = localtime(&time.tv_sec);
             strftime(tmbuf, sizeof tmbuf, "%Y-%m-%d %H:%M:%S", nowtm);

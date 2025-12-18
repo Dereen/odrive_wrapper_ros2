@@ -14,7 +14,7 @@
 using namespace odrive_wrapper;
 
 std::string italic(std::string s) {
-    return "\e[3m" + s + "\e[0m";
+    return "\033[3m" + s + "\033[0m";
 }
 
 std::ostream& odrive_wrapper::operator<<(std::ostream &out, const OdriveAxis &odrive) {
