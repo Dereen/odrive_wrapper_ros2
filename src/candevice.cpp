@@ -38,7 +38,11 @@ int CanDevice::send(uint16_t id, uint16_t dlc, char *data, bool rtr) {
     // write created can message
     int ret = write(s, &f, sizeof(struct can_frame));
     if (ret != sizeof(struct can_frame)) {
-        *error_stream << "[CanDev] Write error: " << std::strerror(errno) << std::endl;
+        *error_stream << "[CanDev:" << dev_name << "] Write error: " << std::strerror(errno) << std::endl;
+        // Mark connection as inactive on network-level errors
+        if (errno == ENETDOWN || errno == ENETUNREACH || errno == ENODEV) {
+            this->active = false;
+        }
         return -1;
     }
 
@@ -68,7 +72,11 @@ int CanDevice::send(uint16_t id, uint16_t dlc, bool rtr) {
     // write created can message
     int ret = write(s, &f, sizeof(struct can_frame));
     if (ret != sizeof(struct can_frame)) {
-        *error_stream << "[CanDev] Write error: " << std::strerror(errno) << std::endl;
+        *error_stream << "[CanDev:" << dev_name << "] Write error: " << std::strerror(errno) << std::endl;
+        // Mark connection as inactive on network-level errors
+        if (errno == ENETDOWN || errno == ENETUNREACH || errno == ENODEV) {
+            this->active = false;
+        }
         return -1;
     }
 
@@ -152,7 +160,7 @@ int CanDevice::init_connection() {
     }
 
     this->active = true;
-    *output_stream << "[CanDev] Opened CAN socket with device " << this->dev_name.c_str() << std::endl;
+    *output_stream << "[CanDev:" << this->dev_name << "] Opened CAN socket" << std::endl;
     return 0;
 }
 
@@ -170,5 +178,5 @@ int CanDevice::close_connection() {
 }
 
 bool CanDevice::is_connected(void) {
-    return fcntl(s, F_GETFD) != -1 || errno != EBADF;
+    return this->active;
 }

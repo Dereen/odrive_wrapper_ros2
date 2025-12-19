@@ -79,9 +79,29 @@ void OdriveCan::init() {
     can_dev = make_unique<class CanDevice>(dev_name, output_stream, error_stream);
 }
 
-void OdriveCan::start(void) {
+bool OdriveCan::start(void) {
 
-    can_dev->init_connection();
+    if (can_dev->init_connection() != 0) {
+        *error_stream << "[OdriveCan] Failed to initialize CAN connection" << std::endl;
+        return false;
+    }
+
+    // Test CAN bus by sending a request to first axis
+    // This verifies the network is actually up (devices present on bus)
+    *output_stream << "[OdriveCan] Testing CAN bus connectivity..." << std::endl;
+    int test_axis = 0;
+    if (!axes_ids.empty()) {
+        test_axis = axes_ids.begin()->first;
+    }
+    int ret = call_get_version(test_axis);
+    if (ret != 0) {
+        *error_stream << "[OdriveCan] CAN bus test failed - network may be down or no devices present" << std::endl;
+        can_dev->close_connection();
+        return false;
+    }
+    *output_stream << "[OdriveCan] CAN bus test passed" << std::endl;
+
+    run = true;
 
     // reset can timestamp
     struct timeval timestamp;
@@ -97,14 +117,29 @@ void OdriveCan::start(void) {
     th_process = std::thread(&OdriveCan::process_msgs, this);
     th_send = std::thread(&OdriveCan::ask_for_current_values, this);
     th_errors = std::thread(&OdriveCan::get_errors, this);
+
+    return true;
 }
 
 void OdriveCan::stop(void) {
     run = false;
-    th_recieve.join();
-    th_process.join();
-    th_send.join();
-    th_errors.join();
+    if (th_recieve.joinable()) th_recieve.join();
+    if (th_process.joinable()) th_process.join();
+    if (th_send.joinable()) th_send.join();
+    if (th_errors.joinable()) th_errors.join();
+}
+
+bool OdriveCan::reconnect(void) {
+    *output_stream << "[OdriveCan] Attempting reconnection..." << std::endl;
+
+    // Stop all threads
+    stop();
+
+    // Close the old connection
+    can_dev->close_connection();
+
+    // Try to start again
+    return start();
 }
 
 void OdriveCan::parse_header(uint32_t header, int *axisID, int *cmdID) {
@@ -142,8 +177,9 @@ void OdriveCan::ask_for_current_values() {
                        std::back_inserter(ids), [](OdriveAxis axis) { return axis.id; });
     }
 
-    while (run) {
+    while (run && is_connected()) {
         for (auto &id: ids) {
+            if (!run || !is_connected()) break;
             // *output_stream << "ask for temp" << std::endl;
             call_get_tempterature(id);
             // *output_stream << "ask for bus ui" << std::endl;
@@ -158,6 +194,7 @@ void OdriveCan::ask_for_current_values() {
         }
         usleep(data_update_ms * 1000);
     }
+    *output_stream << "[SEND] Send thread stopped" << std::endl;
 }
 
 void OdriveCan::get_errors() {
@@ -171,13 +208,15 @@ void OdriveCan::get_errors() {
                        std::back_inserter(ids), [](OdriveAxis axis) { return axis.id; });
     }
 
-    while (run) {
+    while (run && is_connected()) {
         for (auto &id : ids) {
+            if (!run || !is_connected()) break;
             call_get_error(id);
             call_get_controller_error(id);
         }
         usleep(axis_status_update_ms * 1000);
     }
+    *output_stream << "[INFO] Error catching thread stopped" << std::endl;
 }
 
 void OdriveCan::receive_msgs() {
@@ -189,11 +228,12 @@ void OdriveCan::receive_msgs() {
 
     struct can_frame frame;
 
-    while (run) {
+    while (run && is_connected()) {
         // read messages
         int ret = can_dev->recieve(&frame, &timestamp, 1);
         if (ret != 0) {
-            // Failed to receive valid data, skip processing
+            // Failed to receive valid data, check if still connected
+            if (!is_connected()) break;
             continue;
         }
 
@@ -225,9 +265,10 @@ void OdriveCan::receive_msgs() {
 void OdriveCan::process_msgs() {
     *output_stream << "[PROCESS] start processing thread" << std::endl;
     canMsg msg;
-    while (run) {
+    while (run && is_connected()) {
         for (auto &it: this->axes_ids) // iterate over list of axis IDs and its corresponding buffers
         {                               // check buffer for each axis
+            if (!run || !is_connected()) break;
 
             // if buffer for given axis is not empty
             if (!input_buffer[it.second]->empty()) {
@@ -335,6 +376,7 @@ void OdriveCan::process_msgs() {
         }
         usleep(100);
     }
+    *output_stream << "[PROCESS] Processing thread stopped" << std::endl;
 }
 
 void OdriveCan::parse_version(int axisID, canMsg msg) {

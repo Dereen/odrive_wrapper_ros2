@@ -40,7 +40,7 @@ namespace odrive_wrapper {
         struct ifreq ifr;           /*!< Structure with CAN socket info */
         struct sockaddr_can *addr; /*!< Reference to CAN socket address */
         std::string dev_name;       /*!< CAN device name, dafaults to can0 */
-        bool active;               /*!< True if socket was opened and not closed */
+        bool active;               /*!< True if connection is usable (socket open and network up) */
 
         struct can_frame *frame; /*!< Reference to can_frame */
 

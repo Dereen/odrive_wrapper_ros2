@@ -179,13 +179,21 @@ namespace odrive_wrapper {
 
         /**
         * @brief Starts threads and receiving
+        * @return true if connection was established successfully, false otherwise
         */
-        void start(void);
+        bool start(void);
 
         /**
         * @brief Stops threads and receiving
         */
         void stop(void);
+
+        /**
+        * @brief Attempts to reconnect to the CAN device
+        * Stops current threads, closes connection, and tries to restart
+        * @return true if reconnection was successful, false otherwise
+        */
+        bool reconnect(void);
 
         /**
          * @brief Set the data update period
